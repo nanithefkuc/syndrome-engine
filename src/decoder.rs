@@ -6,6 +6,7 @@ use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
 use univariate::{MultipointScratch, Polynomial};
 
+use crate::erasure;
 use crate::error::{ConfigError, DecodeError};
 use crate::forney;
 use crate::keyeq::{KeyEqScratch, KeyEquation, KeyEquationSolver};
@@ -62,6 +63,11 @@ pub struct DecodeScratch<F: FieldKernels> {
     syndrome_poly: Polynomial<F>,
     total_locator: Polynomial<F>,
     total_evaluator: Polynomial<F>,
+    erasure_locator: Polynomial<F>,
+    erasure_swap: Polynomial<F>,
+    erasure_product: Polynomial<F>,
+    modified: Vec<F::Elem>,
+    erased_sorted: Vec<usize>,
     locate_values: Vec<F::Elem>,
     positions: Vec<usize>,
     forney: crate::forney::ForneyScratch<F>,
@@ -96,6 +102,11 @@ impl<F: FieldKernels> DecodeScratch<F> {
             syndrome_poly: reserved_polynomial(redundancy, "decode syndrome series")?,
             total_locator: reserved_polynomial(redundancy + 1, "decode total locator")?,
             total_evaluator: reserved_polynomial(redundancy, "decode total evaluator")?,
+            erasure_locator: reserved_polynomial(redundancy + 1, "erasure locator")?,
+            erasure_swap: reserved_polynomial(redundancy + 1, "erasure locator swap")?,
+            erasure_product: reserved_polynomial(redundancy, "modified syndromes")?,
+            modified: reserved_elements::<F>(redundancy, "modified syndrome sequence")?,
+            erased_sorted: reserved_positions(redundancy, "sorted erasure positions")?,
             locate_values: reserved_elements::<F>(params.n(), "decode locate values")?,
             positions: reserved_positions(params.n(), "decode positions")?,
             forney: crate::forney::ForneyScratch::with_capacity(redundancy + 1)?,
@@ -229,9 +240,18 @@ impl<F: FieldKernels, S: KeyEquationSolver<F>> Decoder<F, S> {
     ) -> Result<DecodeOutcome<'a, F>, DecodeError> {
         self.check_scratch(scratch)?;
         self.compute_syndromes(received, scratch)?;
-        self.decode_core(scratch)?;
-        // Apply the correction in place, then run the re-encode guard on
-        // the corrected word: its syndromes must all vanish.
+        self.solve_pure(scratch)?;
+        self.finish_into(received, scratch)
+    }
+
+    /// Apply the located correction and run the re-encode guard: the
+    /// corrected word's syndromes must all vanish, or the correction was
+    /// spurious and is undone.
+    fn finish_into<'a>(
+        &self,
+        received: &mut [u8],
+        scratch: &'a mut DecodeScratch<F>,
+    ) -> Result<DecodeOutcome<'a, F>, DecodeError> {
         apply_pattern::<F>(received, &scratch.positions, &scratch.magnitudes);
         self.compute_syndromes(received, scratch)?;
         if scratch.syndromes.iter().any(|value| !value.is_zero()) {
@@ -240,6 +260,55 @@ impl<F: FieldKernels, S: KeyEquationSolver<F>> Decoder<F, S> {
             return Err(DecodeError::Inconsistent);
         }
         Ok(Self::outcome(scratch))
+    }
+
+    /// Errors-and-erasures decode: `erased` are known-erased positions,
+    /// folded into the key equation as Forney (modified) syndromes. The
+    /// budget widens to `2ν + ρ ≤ n - k`; flagged and unflagged corruption
+    /// is corrected in one pass, and the word is left untouched on any
+    /// error.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::decode_into`], plus
+    /// [`DecodeError::TooManyErasures`] when more than `n - k` positions
+    /// are erased, [`DecodeError::ErasurePosition`] for a position at or
+    /// beyond `n`, and [`DecodeError::DuplicateErasure`] for a repeated
+    /// position.
+    pub fn decode_with_erasures_into<'a>(
+        &self,
+        received: &mut [u8],
+        erased: &[usize],
+        scratch: &'a mut DecodeScratch<F>,
+    ) -> Result<DecodeOutcome<'a, F>, DecodeError> {
+        self.check_scratch(scratch)?;
+        if erased.len() > self.params.redundancy() {
+            return Err(DecodeError::TooManyErasures {
+                count: erased.len(),
+                limit: self.params.redundancy(),
+            });
+        }
+        scratch.erased_sorted.clear();
+        scratch.erased_sorted.extend_from_slice(erased);
+        scratch.erased_sorted.sort_unstable();
+        for window in scratch.erased_sorted.windows(2) {
+            if window[0] == window[1] {
+                return Err(DecodeError::DuplicateErasure {
+                    position: window[0],
+                });
+            }
+        }
+        if let Some(&position) = scratch.erased_sorted.last()
+            && position >= self.params.n()
+        {
+            return Err(DecodeError::ErasurePosition {
+                got: position,
+                limit: self.params.n(),
+            });
+        }
+        self.compute_syndromes(received, scratch)?;
+        self.solve_with_erasures(scratch)?;
+        self.finish_into(received, scratch)
     }
 
     fn compute_syndromes(
@@ -290,7 +359,7 @@ impl<F: FieldKernels, S: KeyEquationSolver<F>> Decoder<F, S> {
         // solves from (reusing capacity; nothing allocates).
         scratch.syndromes.clear();
         scratch.syndromes.extend_from_slice(syndromes);
-        self.decode_core(scratch)?;
+        self.solve_pure(scratch)?;
         // Syndromes-only certificate: Σ e_p X_p^{b+j} must equal S_j.
         if !self.pattern_matches_syndromes(syndromes, scratch) {
             return Err(DecodeError::Inconsistent);
@@ -308,21 +377,80 @@ impl<F: FieldKernels, S: KeyEquationSolver<F>> Decoder<F, S> {
         Ok(())
     }
 
-    /// The shared core: key equation from `scratch.syndromes` (already
-    /// computed), Chien, Forney, and the root-count guard.
-    fn decode_core(&self, scratch: &mut DecodeScratch<F>) -> Result<(), DecodeError> {
+    /// The pure-error core: key equation from `scratch.syndromes` (already
+    /// computed), then the shared locate/Forney tail.
+    fn solve_pure(&self, scratch: &mut DecodeScratch<F>) -> Result<(), DecodeError> {
         if self.params.syndrome_count() == 0 {
             scratch.positions.clear();
             scratch.magnitudes.clear();
             return Ok(());
         }
-        let count = self.params.syndrome_count();
         self.solver.solve(
             &[&scratch.syndromes],
             &mut scratch.keyeq,
             &mut scratch.keyeq_scratch,
         )?;
         scratch.total_locator.assign_from(scratch.keyeq.locator());
+        self.locate_and_forney(scratch)
+    }
+
+    /// The errors-and-erasures core: erasure locator, Forney (modified)
+    /// syndromes, key equation on the errors-only suffix, product locator,
+    /// then the shared locate/Forney tail.
+    fn solve_with_erasures(&self, scratch: &mut DecodeScratch<F>) -> Result<(), DecodeError> {
+        let count = self.params.syndrome_count();
+        let erasures = scratch.erased_sorted.len();
+        if count == 0 || erasures == 0 {
+            return self.solve_pure(scratch);
+        }
+        erasure::locator_into(
+            &self.params,
+            &scratch.erased_sorted,
+            &mut scratch.erasure_locator,
+            &mut scratch.erasure_swap,
+        )?;
+        scratch
+            .syndrome_poly
+            .assign_coefficients(&scratch.syndromes)?;
+        scratch.erasure_locator.multiply_truncated_into(
+            &scratch.syndrome_poly,
+            count,
+            &mut scratch.erasure_product,
+        )?;
+        erasure::modified_into(
+            count,
+            erasures,
+            &scratch.erasure_product,
+            &mut scratch.modified,
+        );
+        // The suffix is a clean errors-only syndrome sequence; the
+        // solver's budget on it is exactly `2ν ≤ n - k - ρ`. Report the
+        // budget in the decoder's terms when it rejects.
+        self.solver
+            .solve(
+                &[&scratch.modified],
+                &mut scratch.keyeq,
+                &mut scratch.keyeq_scratch,
+            )
+            .map_err(|error| match error {
+                DecodeError::TooManyErrors { errors, .. } => DecodeError::TooManyErrors {
+                    errors,
+                    erasures,
+                    limit: count,
+                },
+                other => other,
+            })?;
+        scratch
+            .keyeq
+            .locator()
+            .multiply_into(&scratch.erasure_locator, &mut scratch.total_locator)?;
+        self.locate_and_forney(scratch)
+    }
+
+    /// The shared tail: Chien over the total locator, the root-count
+    /// guard, the total evaluator, and Forney.
+    fn locate_and_forney(&self, scratch: &mut DecodeScratch<F>) -> Result<(), DecodeError> {
+        let count = self.params.syndrome_count();
         if scratch.total_locator.is_zero() {
             return Err(DecodeError::Inconsistent);
         }
@@ -333,8 +461,8 @@ impl<F: FieldKernels, S: KeyEquationSolver<F>> Decoder<F, S> {
             &mut scratch.locate_values,
             &mut scratch.positions,
         )?;
-        // Miscorrection guard 1: the locator must split into distinct roots
-        // over the position set.
+        // Miscorrection guard 1: the total locator must split into
+        // distinct roots over the position set.
         let degree = scratch.total_locator.coefficient_count() - 1;
         if scratch.positions.len() != degree {
             return Err(DecodeError::DegreeMismatch {

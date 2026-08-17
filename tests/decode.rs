@@ -97,20 +97,26 @@ fn beyond_the_sphere_fails_typed_and_leaves_the_word_untouched() {
         positions.sort();
         let mut state = 0x1300 + errors as u64;
         common::inject::<Gf16>(&mut received, &positions, &mut state);
+        // Past the radius: a typed detection, or — when the word lands in
+        // another codeword's sphere — an undetectable miscorrection to a
+        // true codeword. Both are total; neither is a panic or a
+        // non-codeword "correction".
         let before = received.clone();
         match decoder.decode_into(&mut received, &mut scratch) {
             Err(
                 DecodeError::TooManyErrors { .. }
                 | DecodeError::Inconsistent
                 | DecodeError::DegreeMismatch { .. },
-            ) => {}
+            ) => assert_eq!(received, before, "failed decode must not touch the word"),
             Err(other) => panic!("unexpected error {other:?}"),
-            Ok(outcome) => panic!(
-                "decoded {errors} > t errors to {} corrections",
-                outcome.error_count()
+            Ok(_outcome) => assert!(
+                syndromes(&params, &received)
+                    .expect("syndromes")
+                    .iter()
+                    .all(|value| value.is_zero()),
+                "an accepted correction must yield a true codeword"
             ),
         }
-        assert_eq!(received, before, "failed decode must not touch the word");
     }
 }
 

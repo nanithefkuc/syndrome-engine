@@ -7,90 +7,14 @@
 
 mod common;
 
-use fgf::field::{Elem, Field};
+use common::{brute_force_magnitudes, gaussian_solve, pgz_locator};
+use fgf::field::Field;
 use fgf::kernel::FieldKernels;
 use fgf::{Gf8, Gf16};
 use syndrome_engine::{
     Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver, RsParams, syndromes,
 };
 use univariate::Polynomial;
-
-/// Solve a small dense GF(2^m) system by Gauss–Jordan elimination. Returns
-/// `None` when the system is singular.
-pub fn gaussian_solve<F: FieldKernels>(
-    mut matrix: Vec<Vec<F::Elem>>,
-    mut rhs: Vec<F::Elem>,
-) -> Option<Vec<F::Elem>> {
-    let size = rhs.len();
-    for column in 0..size {
-        let pivot = (column..size).find(|row| !matrix[*row][column].is_zero())?;
-        matrix.swap(column, pivot);
-        rhs.swap(column, pivot);
-        let inverse = matrix[column][column].inv();
-        for coefficient in &mut matrix[column] {
-            *coefficient = coefficient.mul(inverse);
-        }
-        rhs[column] = rhs[column].mul(inverse);
-        let pivot_row = matrix[column].clone();
-        for row in 0..size {
-            if row != column && !matrix[row][column].is_zero() {
-                let factor = matrix[row][column];
-                for (target, source) in matrix[row].iter_mut().zip(&pivot_row) {
-                    *target = target.add(factor.mul(*source));
-                }
-                let source = rhs[column];
-                rhs[row] = rhs[row].add(factor.mul(source));
-            }
-        }
-    }
-    Some(rhs)
-}
-
-/// Textbook Peterson–Gorenstein–Zierler locator: for `ν = t` down to `1`,
-/// solve the Hankel system `Σ_{i=1..ν} Λ_i·S_{ν-i+j} = S_{ν+j}` for the
-/// locator coefficients; the largest nonsingular `ν` wins.
-pub fn pgz_locator<F: FieldKernels>(syndromes: &[F::Elem], radius: usize) -> Vec<F::Elem> {
-    for errors in (1..=radius).rev() {
-        let mut matrix = Vec::with_capacity(errors);
-        for row in 0..errors {
-            // Unknown Λ_i at column i-1: coefficient S_{row + errors - i}.
-            let coefficients: Vec<F::Elem> =
-                (1..=errors).map(|i| syndromes[row + errors - i]).collect();
-            matrix.push(coefficients);
-        }
-        let rhs: Vec<F::Elem> = (0..errors).map(|row| syndromes[errors + row]).collect();
-        if let Some(mut locator) = gaussian_solve::<F>(matrix, rhs) {
-            locator.insert(0, F::Elem::ONE);
-            return locator;
-        }
-    }
-    vec![F::Elem::ONE]
-}
-
-/// Brute-force magnitudes for `ν ≤ 2` errors: solve the Vandermonde system
-/// `Σ_i e_i·X_i^{b+j} = S_j`, `j = 0..ν-1`, directly.
-pub fn brute_force_magnitudes<F: FieldKernels>(
-    params: &RsParams<F>,
-    positions: &[usize],
-    syndromes: &[F::Elem],
-) -> Vec<F::Elem> {
-    let alpha = <F as Field>::GENERATOR;
-    let count = positions.len();
-    assert!(count <= 2, "brute-force oracle covers at most two errors");
-    let mut matrix = Vec::with_capacity(count);
-    for row in 0..count {
-        let coefficients: Vec<F::Elem> = positions
-            .iter()
-            .map(|&position| {
-                let exponent = (position * (params.b() + row)) as u64;
-                alpha.pow(exponent)
-            })
-            .collect();
-        matrix.push(coefficients);
-    }
-    let rhs: Vec<F::Elem> = syndromes[..count].to_vec();
-    gaussian_solve::<F>(matrix, rhs).expect("distinct positions give a nonsingular Vandermonde")
-}
 
 fn fixture<F: FieldKernels>(n: usize, k: usize, b: usize, errors: usize, seed: u64) {
     let params = RsParams::<F>::new(n, k, b).expect("params");

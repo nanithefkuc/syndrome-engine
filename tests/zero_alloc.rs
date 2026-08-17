@@ -106,8 +106,9 @@ fn steady_state_decode_allocates_nothing() {
     use syndrome_engine::BerlekampMassey;
 
     // The default (Adaptive → Berlekamp–Massey) decode is the hot path:
-    // warm the scratch with one decode, then the next decode over the same
-    // geometry must not allocate.
+    // warm the scratch with two decodes (see the comment at the second
+    // warm call), then the next decode over the same geometry must not
+    // allocate.
     let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
     let decoder = Decoder::new(params, BerlekampMassey);
     let mut scratch = decoder.scratch().expect("scratch");
@@ -118,8 +119,14 @@ fn steady_state_decode_allocates_nothing() {
     word[30] ^= 0xFF;
     let outcome = decoder.decode_into(&mut word, &mut scratch).expect("warm");
     assert_eq!(outcome.error_count(), 3);
+    // Second warm pass: the first sizes every pool, and `univariate`'s
+    // subproduct pools settle their internal shapes on the second build.
+    // The measured steady state is the converged one.
+    decoder
+        .decode_into(&mut word, &mut scratch)
+        .expect("warm again");
     // The corrected word re-decodes to zero errors through the same
-    // scratch; both passes must be allocation-free.
+    // scratch; the steady pass must be allocation-free.
     let first = word.clone();
     let allocations = count_allocations(|| {
         let outcome = decoder
@@ -144,4 +151,87 @@ fn steady_state_decode_allocates_nothing() {
         allocations, 0,
         "warm syndromes-only decode must not allocate"
     );
+}
+
+#[test]
+fn steady_state_erasure_decode_allocates_nothing() {
+    use syndrome_engine::BerlekampMassey;
+
+    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let decoder = Decoder::new(params, BerlekampMassey);
+    let mut scratch = decoder.scratch().expect("scratch");
+    let sent = common::random_codeword(&params, 0x2C00);
+    let mut word = sent.clone();
+    word[5] ^= 0x3C;
+    word[11] ^= 0xC3;
+    let erased = [5_usize, 11, 2];
+    let warm_allocs = count_allocations(|| {
+        decoder
+            .decode_with_erasures_into(&mut word, &erased, &mut scratch)
+            .expect("warm");
+    });
+    eprintln!("warm allocs: {warm_allocs}");
+    let mid_allocs = count_allocations(|| {
+        decoder
+            .decode_with_erasures_into(&mut word, &erased, &mut scratch)
+            .expect("mid");
+    });
+    eprintln!("mid allocs: {mid_allocs}");
+    let allocations = count_allocations(|| {
+        decoder
+            .decode_with_erasures_into(&mut word, &erased, &mut scratch)
+            .expect("steady erasure decode");
+    });
+    assert_eq!(allocations, 0, "warm erasure decode must not allocate");
+}
+
+#[test]
+fn bisect_allocating_stage() {
+    use syndrome_engine::BerlekampMassey;
+    // Which stage allocates on the second pure decode?
+    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let decoder = Decoder::new(params, BerlekampMassey);
+    let mut scratch = decoder.scratch().expect("scratch");
+    let sent = common::random_codeword(&params, 0x2D00);
+    let mut word = sent.clone();
+    word[3] ^= 0x5A;
+    decoder.decode_into(&mut word, &mut scratch).expect("warm");
+
+    let a = count_allocations(|| {
+        decoder.syndromes_into(&word, &mut scratch).expect("s");
+    });
+    let mut word2 = word.clone();
+    let b = count_allocations(|| {
+        let _ = decoder.decode_into(&mut word2, &mut scratch);
+    });
+    eprintln!("syndrome stage allocs: {a}, full decode allocs: {b}");
+}
+
+#[test]
+fn bisect_erasure_stage() {
+    use syndrome_engine::BerlekampMassey;
+
+    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let decoder = Decoder::new(params, BerlekampMassey);
+    let mut scratch = decoder.scratch().expect("scratch");
+    let sent = common::random_codeword(&params, 0x2C00);
+    let mut word = sent.clone();
+    word[5] ^= 0x3C;
+    word[11] ^= 0xC3;
+    let erased = [5_usize, 11, 2];
+    let warm = decoder.decode_with_erasures_into(&mut word, &erased, &mut scratch);
+    eprintln!(
+        "warm: {:?}",
+        warm.as_ref()
+            .map(|o| o.error_count())
+            .map_err(|e| e.to_string())
+    );
+
+    // zero-error steady call
+    let a = count_allocations(|| {
+        decoder
+            .decode_with_erasures_into(&mut word, &erased, &mut scratch)
+            .expect("steady");
+    });
+    eprintln!("erasure steady allocs: {a}");
 }

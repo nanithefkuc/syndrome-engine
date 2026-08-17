@@ -133,3 +133,39 @@ fn fixture_words_are_codewords() {
             .all(|value| value.is_zero())
     );
 }
+
+const GF8_21_13_1_MIXED_SENT: [u8; 21] = [
+    0x10, 0x3F, 0x96, 0xAD, 0x57, 0xF9, 0x45, 0x7F, 0xB7, 0xD7, 0x0C, 0xDD, 0x5C, 0x36, 0xCD, 0x06,
+    0x08, 0x06, 0xB0, 0x98, 0x68,
+];
+const GF8_21_13_1_MIXED_RECEIVED: [u8; 21] = [
+    0xB6, 0x3F, 0xDE, 0xAD, 0x57, 0xF9, 0x45, 0x7F, 0xB7, 0x20, 0x0C, 0xDD, 0x5C, 0x36, 0xCD, 0x7B,
+    0x08, 0x06, 0xB0, 0x98, 0xD2,
+];
+const GF8_21_13_1_MIXED_ERASED: [usize; 3] = [2, 9, 20];
+const GF8_21_13_1_MIXED_POSITIONS: [usize; 5] = [0, 2, 9, 15, 20];
+const GF8_21_13_1_MIXED_MAGNITUDES: [u8; 5] = [0xA6, 0x48, 0xF7, 0x7D, 0xBA];
+
+#[test]
+fn mixed_errors_and_erasures_fixture_decodes() {
+    // Freezes the Forney-syndrome convention: 2 errors + 3 erasures at
+    // 2ν + ρ = 7 = d - 1, one unit inside the budget.
+    let params = RsParams::<Gf8>::new(21, 13, 1).expect("params");
+    let decoder = Decoder::new(params, Euclidean);
+    let mut scratch = decoder.scratch().expect("scratch");
+    let mut word = GF8_21_13_1_MIXED_RECEIVED;
+    let outcome = decoder
+        .decode_with_erasures_into(&mut word, &GF8_21_13_1_MIXED_ERASED, &mut scratch)
+        .expect("fixture decodes");
+    assert_eq!(outcome.positions(), GF8_21_13_1_MIXED_POSITIONS);
+    let magnitudes: Vec<u8> = outcome.magnitudes().iter().map(|m| m.to_raw()).collect();
+    assert_eq!(magnitudes, GF8_21_13_1_MIXED_MAGNITUDES);
+    assert_eq!(word, GF8_21_13_1_MIXED_SENT);
+    // The sent vector is a codeword under the frozen convention.
+    assert!(
+        syndromes(&params, &GF8_21_13_1_MIXED_SENT)
+            .expect("syndromes")
+            .iter()
+            .all(|value| value.is_zero())
+    );
+}
