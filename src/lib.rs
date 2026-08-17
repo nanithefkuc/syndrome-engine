@@ -30,12 +30,7 @@
 //!    `e_p = X_p^{1-b}·Ω(X_p^{-1}) / Λ'(X_p^{-1})` with a Montgomery batch
 //!    inversion of the denominators.
 //!
-//! Erasures enter only through their locator: the erasure-locator `Γ(x) =
-//! ∏(1 - Y_j x)` folds into the modified (Forney) syndromes `T(x) = Γ(x)·S(x)`,
-//! the solver recovers the remaining error locator, and Forney runs against
-//! the product locator `Λ·Γ`. The correction guarantee is `2ν + ρ ≤ d - 1`.
 //!
-//! The engine orchestrates; it does not compute. Every field multiply is
 //! `fgf`'s and every polynomial pass is `univariate`'s. The single exception
 //! is Berlekamp–Massey, which synthesizes an LFSR over a scalar *syndrome
 //! sequence* — a decoder concept, not a polynomial.
@@ -65,7 +60,11 @@
 extern crate alloc;
 
 mod error;
+mod keyeq;
 mod params;
+mod syndrome;
 
 pub use error::{ConfigError, DecodeError};
+pub use keyeq::{Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver};
 pub use params::RsParams;
+pub use syndrome::syndromes;

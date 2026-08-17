@@ -145,6 +145,22 @@ pub enum DecodeError {
         /// The repeated position.
         position: usize,
     },
+    /// An upstream polynomial operation could not reserve its buffers.
+    AllocationFailed {
+        /// Name of the operation whose buffer could not be reserved.
+        context: &'static str,
+    },
+}
+
+impl From<univariate::PolynomialError> for DecodeError {
+    fn from(error: univariate::PolynomialError) -> Self {
+        Self::AllocationFailed {
+            context: match error {
+                univariate::PolynomialError::Config(_) => "polynomial buffer",
+                _ => "polynomial arithmetic",
+            },
+        }
+    }
 }
 
 impl fmt::Display for DecodeError {
@@ -184,6 +200,9 @@ impl fmt::Display for DecodeError {
             }
             Self::DuplicateErasure { position } => {
                 write!(formatter, "position {position} was erased twice")
+            }
+            Self::AllocationFailed { context } => {
+                write!(formatter, "a buffer for {context} could not be reserved")
             }
         }
     }

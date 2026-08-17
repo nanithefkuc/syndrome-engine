@@ -15,12 +15,12 @@ unknown positions.
 
 > `syndrome-engine` is a decoder, not a codec and not a polynomial ring.
 > Field arithmetic and byte-buffer vector primitives come from `fgf` — never
-> re-implemented them here. Polynomial evaluation, division, gcd,
-> extended-Euclid, formal derivative, and root-finding come from
-> `univariate` — never re-hosted here. Pure-erasure decoding, wire formats,
-> shard ownership, code-parameter selection, and soft-decision reliability
-> processing belong to consumers. This crate receives a corrupted word and
-> returns the corrections.
+> re-implemented here. Polynomial evaluation, division, gcd, extended-Euclid,
+> formal derivative, and root-finding come from `univariate` — never
+> re-hosted here. Pure-erasure decoding, wire formats, shard ownership,
+> code-parameter selection, and soft-decision reliability processing belong
+> to consumers. This crate receives a corrupted word and returns the
+> corrections.
 
 Everything here decodes **errors at unknown positions**. The rest of the
 stack decodes erasures; this is the missing half. Erasures still enter —
@@ -33,10 +33,10 @@ locator degree and the corrected word must re-encode to all-zero syndromes.
 ## Usage
 
 ```rust
-use fgf::Gf8D;
+use fgf::Gf8;
 use syndrome_engine::{BerlekampMassey, Decoder, RsParams};
 
-let params = RsParams::<Gf8D>::new(255, 223, 1).unwrap();
+let params = RsParams::<Gf8>::new(255, 223, 1).unwrap();
 let decoder = Decoder::new(params, BerlekampMassey);
 let mut scratch = decoder.scratch().unwrap();
 
@@ -57,9 +57,9 @@ Erasures are known-bad positions; hand them in and the budget widens to
 `2·(errors) + (erasures) ≤ n - k`:
 
 ```rust
-# use fgf::Gf8D;
+# use fgf::Gf8;
 # use syndrome_engine::{BerlekampMassey, Decoder, RsParams};
-# let params = RsParams::<Gf8D>::new(255, 223, 1).unwrap();
+# let params = RsParams::<Gf8>::new(255, 223, 1).unwrap();
 # let decoder = Decoder::new(params, BerlekampMassey);
 # let mut scratch = decoder.scratch().unwrap();
 # let mut received = [0u8; 255];
@@ -69,13 +69,15 @@ let outcome = decoder
     .unwrap();
 ```
 
-The engine is generic over `fgf`'s binary fields — `Gf8B` (AES `0x11B`),
-`Gf8D` (`0x11D`, the classical RS field), `Gf16`, `Gf32`, `Gf64` — with the
-primitive element `F::GENERATOR` and the syndrome offset `b` frozen per
-decoder. Both key-equation backends are available behind the
-`KeyEquationSolver` trait; they are Dornstetter-equivalent and cross-checked
-against each other (and against a textbook Peterson–Gorenstein–Zierler
-oracle in the test suite) on every fixture.
+The engine is generic over `fgf`'s binary fields — `Gf8` (AES `0x11B`),
+`Gf16`, `Gf32`, `Gf64` — with the primitive element `F::GENERATOR` and the
+syndrome offset `b` frozen per decoder. (When `fgf`'s `Gf8B`/`Gf8D` field
+split lands and `univariate` re-pins it, `Gf8D` — the classical `0x11D` RS
+field — joins the matrix with a one-line rev swap.) Both key-equation
+backends are available behind the `KeyEquationSolver` trait; they are
+Dornstetter-equivalent and cross-checked against each other (and against a
+textbook Peterson–Gorenstein–Zierler oracle in the test suite) on every
+fixture.
 
 Consumers that already hold syndromes (`reliability-engine` recomputes them
 far more often than words) skip the evaluation pass with
@@ -109,8 +111,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
 
 The MSRV is **1.89** (edition 2024). Benchmarks go through `criterion`;
 backend-selection thresholds and the Berlekamp–Massey ↔ Euclidean crossover
-are measured and recorded in [`BENCHMARKS.md`](BENCHMARKS.md), never in doc
-comments.
+are measured and recorded in `BENCHMARKS.md`, never in doc comments.
 
 ## License
 
