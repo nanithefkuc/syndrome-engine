@@ -107,10 +107,7 @@ impl<F: FieldKernels> ForneyScratch<F> {
 /// prefix products. Every element must be nonzero; callers zero-test
 /// explicitly before inverting (S7) — the inherited `inv(0) == 0` would
 /// otherwise poison the whole batch.
-pub(crate) fn batch_invert_into<F: FieldKernels>(
-    values: &mut [F::Elem],
-    prefix: &mut Vec<F::Elem>,
-) {
+pub fn batch_invert_into<F: FieldKernels>(values: &mut [F::Elem], prefix: &mut Vec<F::Elem>) {
     prefix.clear();
     let mut running = F::Elem::ONE;
     for value in values.iter_mut() {

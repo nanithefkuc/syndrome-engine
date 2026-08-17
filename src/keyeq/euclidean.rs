@@ -24,7 +24,7 @@ use crate::keyeq::{KeyEqScratch, KeyEquation, KeyEquationSolver};
 ///
 /// Composes [`univariate::truncated_eea`] and therefore allocates through
 /// its internal buffers; it is the permanent cross-check against
-/// Berlekamp–Massey (allocation-free in its steady state) rather
+/// [`crate::BerlekampMassey`] (allocation-free in its steady state) rather
 /// than the hot path.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Euclidean;

@@ -41,6 +41,15 @@ rayon = { version = "1", optional = true }
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 proptest = { version = "1", default-features = true }
 
+[[bench]]
+name = "decode"
+harness = false
+required-features = ["internals"]
+
+[profile.bench]
+lto = "thin"
+codegen-units = 1
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

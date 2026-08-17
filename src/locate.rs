@@ -24,10 +24,7 @@ use crate::params::RsParams;
 
 /// Write the position points `α^{-0}, α^{-1}, …, α^{-(n-1)}` into `points`,
 /// stepping by `α^{-1}` from one.
-pub(crate) fn position_points_into<F: FieldKernels>(
-    params: &RsParams<F>,
-    points: &mut Vec<F::Elem>,
-) {
+pub fn position_points_into<F: FieldKernels>(params: &RsParams<F>, points: &mut Vec<F::Elem>) {
     points.clear();
     let step = <F as Field>::GENERATOR.inv();
     let mut point = F::Elem::ONE;
@@ -44,7 +41,7 @@ pub(crate) fn position_points_into<F: FieldKernels>(
 ///
 /// Returns [`DecodeError::AllocationFailed`] when the evaluation cannot
 /// reserve a buffer.
-pub(crate) fn locate_into<F: FieldKernels>(
+pub fn locate_into<F: FieldKernels>(
     locator: &Polynomial<F>,
     position_points: &[F::Elem],
     eval: &mut MultipointScratch<F>,

@@ -151,10 +151,11 @@ fn reserved_positions(capacity: usize, context: &'static str) -> Result<Vec<usiz
 /// Forney, and the miscorrection guards, over one code geometry and one
 /// key-equation backend.
 ///
-/// The default solver is `BerlekampMassey` once it exists (the
-/// allocation-free LFSR synthesis); [`crate::Euclidean`] composes
+/// The default solver is [`crate::Adaptive`]: Berlekamp–Massey (the
+/// allocation-free LFSR synthesis) on the hot path, with the Euclidean
+/// backend past the measured crossover; [`crate::Euclidean`] composes
 /// `univariate`'s allocating truncated EEA and is the cross-check backend.
-pub struct Decoder<F: FieldKernels, S: KeyEquationSolver<F> = crate::keyeq::Euclidean> {
+pub struct Decoder<F: FieldKernels, S: KeyEquationSolver<F> = crate::cost::Adaptive> {
     params: RsParams<F>,
     solver: S,
 }

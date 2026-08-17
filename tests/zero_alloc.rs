@@ -4,11 +4,13 @@
 //! The counter is scoped to the counting thread: sibling tests running in
 //! parallel must not be charged to a measurement.
 //!
-//! Scope note: the Berlekamp–Massey decode is the zero-allocation hot path
-//! and is asserted here once it is the default solver; the Euclidean
-//! backend composes `univariate`'s allocating `truncated_eea` by design and
-//! is the cross-check, not the hot path. The syndrome `_into` pass below is
-//! allocation-free with either solver behind it.
+//! Scope note: the default `Adaptive` solver picks Berlekamp–Massey
+//! through the measured crossover (`cost::BM_EUCLIDEAN_CROSSOVER`, see
+//! `BENCHMARKS.md`), so every default decode in the parity band is
+//! allocation-free — asserted here. Past the threshold it dispatches to the
+//! Euclidean backend, which composes `univariate`'s allocating
+//! `truncated_eea` by design; that path is the latency choice, not the
+//! zero-allocation choice.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
@@ -95,4 +97,51 @@ fn steady_state_syndrome_pass_allocates_nothing() {
             .expect("steady syndromes");
     });
     assert_eq!(allocations, 0, "warm syndrome pass must not allocate");
+}
+
+mod common;
+
+#[test]
+fn steady_state_decode_allocates_nothing() {
+    use syndrome_engine::BerlekampMassey;
+
+    // The default (Adaptive → Berlekamp–Massey) decode is the hot path:
+    // warm the scratch with one decode, then the next decode over the same
+    // geometry must not allocate.
+    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let decoder = Decoder::new(params, BerlekampMassey);
+    let mut scratch = decoder.scratch().expect("scratch");
+    let sent = common::random_codeword(&params, 0x2B00);
+    let mut word = sent.clone();
+    word[3] ^= 0x5A;
+    word[17] ^= 0xA5;
+    word[30] ^= 0xFF;
+    let outcome = decoder.decode_into(&mut word, &mut scratch).expect("warm");
+    assert_eq!(outcome.error_count(), 3);
+    // The corrected word re-decodes to zero errors through the same
+    // scratch; both passes must be allocation-free.
+    let first = word.clone();
+    let allocations = count_allocations(|| {
+        let outcome = decoder
+            .decode_into(&mut word, &mut scratch)
+            .expect("steady decode");
+        assert_eq!(outcome.error_count(), 0);
+    });
+    assert_eq!(allocations, 0, "warm decode must not allocate");
+    assert_eq!(word, first);
+
+    // From syndromes, too: the reliability-engine steady state.
+    let values = decoder
+        .syndromes_into(&word, &mut scratch)
+        .expect("syndromes")
+        .to_vec();
+    let allocations = count_allocations(|| {
+        decoder
+            .decode_syndromes_into(&values, &mut scratch)
+            .expect("steady syndrome decode");
+    });
+    assert_eq!(
+        allocations, 0,
+        "warm syndromes-only decode must not allocate"
+    );
 }

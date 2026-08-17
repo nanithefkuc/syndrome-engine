@@ -35,7 +35,7 @@ pub(crate) fn points_into<F: FieldKernels>(params: &RsParams<F>, points: &mut Ve
 /// Compute the syndromes of a packed received word into `values`.
 ///
 /// `word` holds the received word as a scratch polynomial, `points` the
-/// evaluation points (see [`points_into`]), and `eval` the reusable
+/// evaluation points (from `points_into`), and `eval` the reusable
 /// multipoint machinery; all three are caller-owned so the steady state
 /// allocates nothing.
 ///
@@ -44,7 +44,7 @@ pub(crate) fn points_into<F: FieldKernels>(params: &RsParams<F>, points: &mut Ve
 /// Returns [`DecodeError::WordGeometry`] when `received` does not hold
 /// exactly `n` packed field elements, and [`DecodeError::AllocationFailed`]
 /// when an upstream buffer cannot be reserved.
-pub(crate) fn compute_into<F: FieldKernels>(
+pub fn compute_into<F: FieldKernels>(
     params: &RsParams<F>,
     received: &[u8],
     points: &[F::Elem],
@@ -71,7 +71,8 @@ pub(crate) fn compute_into<F: FieldKernels>(
 /// Compute the `n - k` syndromes of a packed received word.
 ///
 /// Allocating convenience form of the internal scratch path, for diagnostics
-/// and for consumers seeding the syndromes-only decode entry.
+/// and for consumers seeding the syndromes-only decode entry
+/// ([`crate::Decoder::decode_syndromes_into`]).
 ///
 /// # Errors
 ///

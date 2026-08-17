@@ -12,9 +12,11 @@
 //! multi-sequence generalization (a common locator synthesized from several
 //! interleaved syndrome rows) is another implementation behind the same
 //! contract, not a new interface.
+mod berlekamp;
 mod equation;
 mod euclidean;
 
+pub use berlekamp::BerlekampMassey;
 pub use equation::{KeyEqScratch, KeyEquation};
 pub use euclidean::Euclidean;
 
@@ -25,7 +27,7 @@ use crate::error::DecodeError;
 /// Solve the key equation for the error-locator `Λ` and error-evaluator `Ω`.
 ///
 /// Backends: [`Euclidean`] (truncated EEA over the polynomial ring) and
-/// Berlekamp–Massey (LFSR synthesis over the scalar sequence, `berlekamp_massey`).
+/// [`crate::BerlekampMassey`] (LFSR synthesis over the scalar sequence).
 /// They are Dornstetter-equivalent; both are cross-checked on every fixture.
 ///
 /// # Errors

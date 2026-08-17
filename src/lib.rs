@@ -59,6 +59,7 @@
 
 extern crate alloc;
 
+mod cost;
 mod decoder;
 mod error;
 mod forney;
@@ -67,8 +68,19 @@ mod locate;
 mod params;
 mod syndrome;
 
+pub use cost::{Adaptive, BM_EUCLIDEAN_CROSSOVER, SolverBackend, SolverCostKey, select_solver};
 pub use decoder::{DecodeOutcome, DecodeScratch, Decoder};
 pub use error::{ConfigError, DecodeError};
-pub use keyeq::{Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver};
+pub use keyeq::{BerlekampMassey, Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver};
 pub use params::RsParams;
 pub use syndrome::syndromes;
+
+/// The crate's unstable surface for benchmarks and downstream
+/// experimentation, gated on the `internals` feature. Nothing here is a
+/// compatibility promise.
+#[cfg(feature = "internals")]
+pub mod stages {
+    pub use crate::forney::batch_invert_into;
+    pub use crate::locate::{locate_into, position_points_into};
+    pub use crate::syndrome::compute_into;
+}

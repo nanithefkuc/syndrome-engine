@@ -2,6 +2,7 @@
 
 use univariate::Polynomial;
 
+use super::berlekamp::BmScratch;
 use crate::error::ConfigError;
 
 /// The solved key equation: error locator `Λ` and error evaluator `Ω`.
@@ -63,6 +64,8 @@ pub struct KeyEqScratch<F: fgf::kernel::FieldKernels> {
     pub(crate) x_pow: Polynomial<F>,
     /// The syndrome series as the EEA divisor operand.
     pub(crate) series: Polynomial<F>,
+    /// Berlekamp–Massey registers.
+    pub(crate) bm: BmScratch<F>,
 }
 
 impl<F: fgf::kernel::FieldKernels> KeyEqScratch<F> {
@@ -77,6 +80,7 @@ impl<F: fgf::kernel::FieldKernels> KeyEqScratch<F> {
         Ok(Self {
             x_pow: reserved_polynomial::<F>(capacity + 1, "key-equation x^N operand")?,
             series: reserved_polynomial::<F>(capacity, "key-equation syndrome operand")?,
+            bm: BmScratch::with_capacity(capacity)?,
         })
     }
 }
