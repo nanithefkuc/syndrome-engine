@@ -59,11 +59,15 @@
 
 extern crate alloc;
 
+mod decoder;
 mod error;
+mod forney;
 mod keyeq;
+mod locate;
 mod params;
 mod syndrome;
 
+pub use decoder::{DecodeOutcome, DecodeScratch, Decoder};
 pub use error::{ConfigError, DecodeError};
 pub use keyeq::{Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver};
 pub use params::RsParams;
