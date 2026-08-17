@@ -93,14 +93,23 @@ fn interpreter() -> Option<Vec<String>> {
         return Some(vec!["python3".into()]);
     }
     let uv = Command::new("uv")
-        .args(["run", "--with", "galois", "python", "-c", "import galois"])
+        .args([
+            "run",
+            "--with",
+            "galois==0.4.11",
+            "python",
+            "-c",
+            "import galois",
+        ])
         .output();
     if uv.is_ok_and(|output| output.status.success()) {
+        // Pinned so runner environments resolve the version the
+        // coefficient conventions were verified against.
         return Some(vec![
             "uv".into(),
             "run".into(),
             "--with".into(),
-            "galois".into(),
+            "galois==0.4.11".into(),
             "python".into(),
         ]);
     }
