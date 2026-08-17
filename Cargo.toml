@@ -1,0 +1,45 @@
+[package]
+name = "syndrome-engine"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT"
+publish = false
+description = "Bounded-distance Reed-Solomon / BCH decoding via the key equation: syndromes, Berlekamp-Massey and Euclidean solvers, Chien search, Forney."
+categories = ["algorithms", "mathematics", "no-std"]
+exclude = ["/.github", "/.plans"]
+
+[features]
+default = ["std", "simd"]
+std = ["fgf/std", "univariate/std"]
+# simd implies std, as in fgf and gfm: fgf's backend cache is a LazyLock, and a
+# simd-without-std combination would compile and silently run scalar.
+simd = ["std", "fgf/simd"]
+# Optional block/interleave-axis parallelism. Off by default; must not enter
+# default or no-std builds.
+parallel = ["std", "dep:rayon"]
+# syndrome-engine's own unstable surface, for benchmarks and downstream
+# experimentation. Not a compatibility promise. Distinct from fgf's and
+# univariate's `internals`, which this crate deliberately does not take.
+internals = []
+
+[dependencies]
+# Field arithmetic and packed-buffer vector kernels, pinned by rev: a
+# floating dependency is a format-break risk when the dependency feeds wire
+# bytes. This rev matches `univariate`'s own pin so cargo resolves one copy.
+fgf = { git = "https://github.com/nanithefkuc/fgf", rev = "d0e331cec2e6ae5645e529597fa913db467a44cd" }
+# Every polynomial operation: syndrome evaluation, the truncated-EEA
+# key-equation primitive, Chien search, Hasse/formal derivatives. Bare
+# (`default-features = false`) so the `fft` composition and with it
+# `butterfly-fft` never enter this crate's dependency tree.
+univariate = { git = "https://github.com/nanithefkuc/univariate", rev = "487997ede763a49e68da101b3d5a08f48ffec4e4", default-features = false }
+rayon = { version = "1", optional = true }
+
+[dev-dependencies]
+# Default features pull in plotters + rayon, which this harness does not use.
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+proptest = { version = "1", default-features = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: fmt, clippy, test, doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --all-targets --no-default-features -- -D warnings
+      - run: cargo test
+      - run: cargo test --all-features
+      - run: cargo test --no-default-features
+      - run: cargo doc --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  cross:
+    name: cross-compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu, wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --target aarch64-unknown-linux-gnu --no-default-features
+      - run: cargo build --target wasm32-unknown-unknown --no-default-features
+
+  msrv:
+    name: minimum supported rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --all-features
+
+  deps:
+    name: dependency tree shape
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: normal dependencies carry fgf and univariate only
+        run: |
+          cargo tree --depth 1 -e normal | tee tree.txt
+          grep -q fgf tree.txt
+          grep -q univariate tree.txt
+          ! grep -Eq 'gfm|butterfly-fft|sgraph|lattica|archmage|simdispatch|rayon' tree.txt
+      - name: no-default-features carries the same pair, no std
+        run: |
+          cargo tree --depth 1 -e normal --no-default-features | tee tree-core.txt
+          grep -q fgf tree-core.txt
+          grep -q univariate tree-core.txt
+          ! grep -Eq 'gfm|butterfly-fft|sgraph|lattica|archmage|simdispatch|rayon' tree-core.txt
+
+  backends:
+    name: forced backend panel
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        backend: [v3_gfni_crypto, v3, v2, scalar]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --all-features
+        env:
+          SIMD_BACKEND: ${{ matrix.backend }}
