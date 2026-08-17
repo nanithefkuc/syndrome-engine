@@ -35,7 +35,10 @@ Initial implementation of the bounded-distance error-decoding engine.
 - Test oracles: textbook Peterson–Gorenstein–Zierler locator,
   brute-force Vandermonde magnitudes, per-point Horner syndromes, the
   BM↔Euclidean cross-check on every fixture, frozen interop fixtures
-  pinning the wire convention, and a skipping `galois` differential.
+  pinning the wire convention, and a `galois` differential (field-level:
+  Berlekamp–Massey, locator roots, syndromes, generator polynomials over
+  the matching GF(2^8)/0x11B) running under `python3` or `uv`, skipping
+  loudly when neither is present.
 - Hand-rolled `ConfigError` / `DecodeError` enums, one per failure domain,
   every variant carrying the offending value and the limit.
 - Runtime dependency set frozen to `{fgf, univariate}` (rev-pinned,
