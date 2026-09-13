@@ -49,6 +49,27 @@
 10. **Oracles stay independent.** An implementation is never its own test;
     BM and Euclidean check each other and both check against textbook PGZ.
 
+## Tooling
+
+`just validate` is the PR gate — lint, the dependency allowlist, docs, the
+feature matrix, the tier matrix, the Miri step, and coverage in one run.
+The shared recipe surface is documented once in the umbrella's root
+`AGENTS.md`; only this crate's values are below.
+
+- `TIERS := 'v3_gfni_crypto v3 v2 scalar'`. The engine owns no kernels —
+  these are `fgf`'s tiers, reached through it, and the GFNI tier is on the
+  list because `fgf`'s GF(2^m) multiply has a kernel there. `just test-tiers`
+  and `just cover` pin `SIMD_BACKEND` to each in turn, so the syndrome,
+  Chien, and Forney paths are exercised over every backend `fgf` resolves
+  to, not just the host's best.
+- `MIRI` is empty: `#![forbid(unsafe_code)]` leaves nothing to interpret, so
+  `just unsafe-check` reports the empty surface and skips. An argument set
+  appearing here would mean non-negotiable 2 had been broken.
+- One bench target, `decode`, requiring `internals`: `just bench decode`,
+  `just perf-bench decode 20`.
+- `justfile` is a byte-identical vendored copy; never edit it here. This
+  crate's values and any crate-specific recipe belong in `crate.just`.
+
 ## Working here
 
 - Edition 2024, MSRV 1.89. No toolchain pin; select `+1.89.0` for the MSRV
