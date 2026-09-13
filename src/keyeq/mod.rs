@@ -4,7 +4,7 @@
 //! syndrome sequence `S_0, …, S_{N-1}`, solved for the error locator `Λ`
 //! (normalized to `Λ(0) = 1`) and the error evaluator `Ω` with
 //! `deg Ω < deg Λ ≤ N/2`. Berlekamp–Massey (engine-native LFSR synthesis)
-//! and Euclidean/Sugiyama (`univariate`'s truncated EEA) compute the same
+//! and Euclidean/Sugiyama (`poly-ring`'s truncated EEA) compute the same
 //! pair on every decodable input; mutual cross-checking is the crate's
 //! strongest oracle.
 //!

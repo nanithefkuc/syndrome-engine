@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Switched the runtime ring dependency from the retired `univariate` to
+  its successor `poly-ring` (rev-pinned, `default-features = false`).
+  The public surface, wire fixtures, and error mapping are unchanged;
+  the runtime dependency set remains `{fgf, poly-ring}`, asserted by CI.
+
 ## 0.0.0 (2026-08-17)
 
 Initial implementation of the bounded-distance error-decoding engine.

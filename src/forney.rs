@@ -9,14 +9,14 @@
 //! `e_p = X_p · Ω(y_p) / (X_p^{b} · Λ'(y_p))` with `y_p = X_p^{-1}`, so the
 //! exponent `b` folds into the batch-inverted denominators and no modular
 //! exponent arithmetic is left. The formal derivative is evaluated
-//! pointwise through `univariate`'s order-1 Hasse derivative — in
+//! pointwise through `poly-ring`'s order-1 Hasse derivative — in
 //! characteristic two that keeps exactly the odd-degree terms, the
 //! half-work simplification, without materializing the derivative
 //! polynomial.
 //!
 //! Denominators are inverted together by Montgomery's batch trick: one
 //! field inversion plus `3(ν-1)` multiplications. There is no upstream
-//! batch-inversion helper to compose (neither `fgf` nor `univariate` ships
+//! batch-inversion helper to compose (neither `fgf` nor `poly-ring` ships
 //! one), and the loop is scalar sequence logic over `fgf::field::Elem` —
 //! the same sanction Berlekamp–Massey has. `inv(0) == 0` is inherited from
 //! `fgf`; a zero denominator is an explicit `is_zero()` rejection before
@@ -26,7 +26,7 @@ use alloc::vec::Vec;
 
 use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
-use univariate::Polynomial;
+use poly_ring::Polynomial;
 
 use crate::error::DecodeError;
 use crate::params::RsParams;
@@ -134,9 +134,9 @@ pub fn batch_invert_into<F: FieldKernels>(values: &mut [F::Elem], prefix: &mut V
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fgf::Gf8;
+    use fgf::Gf8B;
 
-    fn noise_values(count: usize, seed: u64) -> Vec<fgf::gf8::Elem> {
+    fn noise_values(count: usize, seed: u64) -> Vec<fgf::gf8b::Elem> {
         let mut state = seed;
         (0..count)
             .map(|_| {
@@ -144,7 +144,8 @@ mod tests {
                     state = state
                         .wrapping_mul(6_364_136_223_846_793_005)
                         .wrapping_add(1_442_695_040_888_963_407);
-                    let value = fgf::gf8::Elem(u8::try_from(state % 256).expect("reduced byte"));
+                    let value =
+                        fgf::gf8b::Elem::from_raw(u8::try_from(state % 256).expect("reduced byte"));
                     if !value.is_zero() {
                         return value;
                     }
@@ -159,7 +160,7 @@ mod tests {
             let values = noise_values(count, 0x0BAD_C0DE + count as u64);
             let mut inverted = values.clone();
             let mut prefix = Vec::new();
-            batch_invert_into::<Gf8>(&mut inverted, &mut prefix);
+            batch_invert_into::<Gf8B>(&mut inverted, &mut prefix);
             for (original, inverted) in values.iter().zip(&inverted) {
                 assert_eq!(*inverted, original.inv());
             }
@@ -171,7 +172,7 @@ mod tests {
         let mut values = noise_values(1, 0x5EED);
         let original = values[0];
         let mut prefix = Vec::new();
-        batch_invert_into::<Gf8>(&mut values, &mut prefix);
+        batch_invert_into::<Gf8B>(&mut values, &mut prefix);
         assert_eq!(values[0], original.inv());
     }
 }

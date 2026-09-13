@@ -7,7 +7,7 @@
 //! (exactly, for tiers every field implements).
 
 use fgf::kernel::{Backend, backend_for};
-use fgf::{Gf8, Gf16};
+use fgf::{Gf8B, Gf16};
 
 #[test]
 fn forced_backend_is_selected() {
@@ -22,7 +22,7 @@ fn forced_backend_is_selected() {
         "scalar" => Backend::Scalar,
         other => panic!("unknown SIMD_BACKEND tier {other}"),
     };
-    for selected in [backend_for::<Gf8>(), backend_for::<Gf16>()] {
+    for selected in [backend_for::<Gf8B>(), backend_for::<Gf16>()] {
         // Downgrade-only: the selected backend is never stronger than the
         // request; a field without kernels at the tier settles lower.
         assert!(

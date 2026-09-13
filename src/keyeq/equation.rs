@@ -1,13 +1,13 @@
 //! The key-equation result pair and the solver scratch.
 
-use univariate::Polynomial;
+use poly_ring::Polynomial;
 
 use super::berlekamp::BmScratch;
 use crate::error::ConfigError;
 
 /// The solved key equation: error locator `Λ` and error evaluator `Ω`.
 ///
-/// Both are `univariate` polynomials in the crate-wide low-degree-first
+/// Both are `poly-ring` polynomials in the crate-wide low-degree-first
 /// coefficient order. `Λ` is normalized to `Λ(0) = 1`; its roots are the
 /// inverse error locators `X_i^{-1} = α^{-p_i}`. `Ω` satisfies
 /// `Λ(x)·S(x) ≡ Ω(x) (mod x^{N})` with `deg Ω < deg Λ`.
@@ -55,7 +55,7 @@ impl<F: fgf::kernel::FieldKernels> KeyEquation<F> {
 ///
 /// Holds the EEA operand buffers (`x^{N}` and the syndrome series) and the
 /// Berlekamp–Massey register buffers, so a warmed solve allocates nothing on
-/// the Berlekamp–Massey path. The Euclidean backend composes `univariate`'s
+/// the Berlekamp–Massey path. The Euclidean backend composes `poly-ring`'s
 /// allocating `truncated_eea` and is the cross-check rather than the hot
 /// path.
 #[derive(Debug)]

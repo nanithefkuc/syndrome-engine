@@ -6,24 +6,24 @@
 > find the locator roots, and evaluate the error magnitudes — and never
 > construct the code, own a wire format, or do soft-decision reliability
 > processing. Field arithmetic comes from `fgf`; all polynomial arithmetic
-> from `univariate`. This engine receives a corrupted word and returns the
+> from `poly-ring`. This engine receives a corrupted word and returns the
 > corrections.
 
 > `syndrome-engine` is a decoder, not a codec and not a polynomial ring.
 > Field arithmetic and byte-buffer vector primitives come from `fgf` — never
 > re-implement them here. Polynomial evaluation, division, gcd,
 > extended-Euclid, formal derivative, and root-finding come from
-> `univariate` — never re-host them here. Pure-erasure decoding, wire
+> `poly-ring` — never re-host them here. Pure-erasure decoding, wire
 > formats, shard ownership, code-parameter selection, and soft-decision
 > reliability processing belong to consumers. This crate receives a
 > corrupted word and returns the corrections.
 
 ## Non-negotiables
 
-1. **The engine orchestrates; `univariate` computes.** No polynomial ring
-   loop lives here. Syndromes are `univariate` evals, the Euclidean key
-   equation is `univariate`'s truncated EEA, roots are a `univariate`
-   position scan, Forney is `univariate` eval + Hasse derivative. Adding a
+1. **The engine orchestrates; `poly-ring` computes.** No polynomial ring
+   loop lives here. Syndromes are `poly-ring` evals, the Euclidean key
+   equation is `poly-ring`'s truncated EEA, roots are a `poly-ring`
+   position scan, Forney is `poly-ring` eval + Hasse derivative. Adding a
    private poly routine is the defect this layering exists to prevent.
 2. **Compose `fgf`, never re-host.** Call `fgf::field::Elem` / `fgf::ops::*`
    directly. No hand-rolled field loop; `#![forbid(unsafe_code)]`.
@@ -38,7 +38,7 @@
    enters the dependency tree.
 6. **Steady-state zero allocation.** `DecodeScratch` sized once,
    geometry-checked, every hot path `*_into`. Proven by
-   `tests/zero_alloc.rs`. (The Euclidean backend composes `univariate`'s
+   `tests/zero_alloc.rs`. (The Euclidean backend composes `poly-ring`'s
    allocating `truncated_eea` and is the cross-check, not the hot path.)
 7. **`inv(0) == 0` is inherited.** Discrepancy / leading-coefficient /
    Forney-denominator zero-tests are explicit `is_zero()` calls.
@@ -55,7 +55,7 @@
   job.
 - Features: `default = ["std", "simd"]`; `simd` implies `std`; `parallel` is
   an off-by-default no-op placeholder; `internals` exposes this crate's
-  unstable surface (never `fgf`'s or `univariate`'s — we do not enable
+  unstable surface (never `fgf`'s or `poly-ring`'s — we do not enable
   them).
 - `src/lib.rs` and every `mod.rs` hold declarations only — no function
   bodies, no `impl` blocks. Public items are re-exported at the crate root.

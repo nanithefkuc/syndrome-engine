@@ -152,11 +152,11 @@ pub enum DecodeError {
     },
 }
 
-impl From<univariate::PolynomialError> for DecodeError {
-    fn from(error: univariate::PolynomialError) -> Self {
+impl From<poly_ring::PolynomialError> for DecodeError {
+    fn from(error: poly_ring::PolynomialError) -> Self {
         Self::AllocationFailed {
             context: match error {
-                univariate::PolynomialError::Config(_) => "polynomial buffer",
+                poly_ring::PolynomialError::Config(_) => "polynomial buffer",
                 _ => "polynomial arithmetic",
             },
         }

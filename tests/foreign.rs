@@ -12,9 +12,9 @@
 //! GF(2^8) with primitive element 3, while `galois`'s `ReedSolomon`
 //! constructor will not take that primitive for a custom field (its
 //! default alpha is not 3 and forcing it trips an internal assertion).
-//! When `fgf`'s `Gf8D` (`0x11D`) lands, `galois`'s default field matches it
-//! exactly and the end-to-end `ReedSolomon.decode` differential extends
-//! naturally.
+//! `fgf`'s `Gf8D` (`0x11D`) has landed and `galois`'s default field matches
+//! it exactly; extending the end-to-end `ReedSolomon.decode` differential to
+//! it is a natural follow-up.
 
 mod common;
 
@@ -30,7 +30,7 @@ import sys
 import galois
 
 GF = galois.GF(2**8, irreducible_poly=0x11B)
-ALPHA = GF(3)  # matches fgf's Gf8::GENERATOR (0x11B, generator 3)
+ALPHA = GF(3)  # matches fgf's Gf8B::GENERATOR (0x11B, generator 3)
 
 def powers():
     table = {}
@@ -198,21 +198,21 @@ fn galois_field_and_solver_differential() {
 
     // A real decode scenario at the correction boundary: codeword, t
     // errors, solve — send the locator. (31, 19) has t = 6.
-    let params = syndrome_engine::RsParams::<fgf::Gf8>::new(31, 19, 1).expect("params");
+    let params = syndrome_engine::RsParams::<fgf::Gf8B>::new(31, 19, 1).expect("params");
     let sent = common::random_codeword(&params, 0xD200);
     let mut received = sent.clone();
     let mut positions = common::distinct_positions(31, 6, 0xD201);
     positions.sort();
     let mut error_state = 0xD202;
-    common::inject::<fgf::Gf8>(&mut received, &positions, &mut error_state);
+    common::inject::<fgf::Gf8B>(&mut received, &positions, &mut error_state);
     let values = syndrome_engine::syndromes(&params, &received).expect("syndromes");
-    let mut keyeq = syndrome_engine::KeyEquation::<fgf::Gf8>::with_capacity(16).expect("keyeq");
+    let mut keyeq = syndrome_engine::KeyEquation::<fgf::Gf8B>::with_capacity(16).expect("keyeq");
     let mut scratch = syndrome_engine::KeyEqScratch::with_capacity(values.len()).expect("scratch");
     syndrome_engine::BerlekampMassey
         .solve(
             &[&values
                 .iter()
-                .map(|v| fgf::gf8::Elem(v.to_raw()))
+                .map(|v| fgf::gf8b::Elem::from_raw(v.to_raw()))
                 .collect::<Vec<_>>()],
             &mut keyeq,
             &mut scratch,
@@ -221,7 +221,7 @@ fn galois_field_and_solver_differential() {
     let locator: Vec<u8> = keyeq
         .locator()
         .coefficients()
-        .map(|c: fgf::gf8::Elem| c.to_raw())
+        .map(|c: fgf::gf8b::Elem| c.to_raw())
         .collect();
     requests.push_str(&format!(
         "ROOTS {} {}\n",
@@ -262,9 +262,11 @@ fn galois_field_and_solver_differential() {
     // 1. Berlekamp–Massey agrees with the engine on every sequence.
     for (response, sequence) in responses.iter().zip(&sequences) {
         let expected = parse_values(response);
-        let elements: Vec<fgf::gf8::Elem> =
-            sequence.iter().map(|raw| fgf::gf8::Elem(*raw)).collect();
-        let mut out = syndrome_engine::KeyEquation::<fgf::Gf8>::with_capacity(48).expect("out");
+        let elements: Vec<fgf::gf8b::Elem> = sequence
+            .iter()
+            .map(|raw| fgf::gf8b::Elem::from_raw(*raw))
+            .collect();
+        let mut out = syndrome_engine::KeyEquation::<fgf::Gf8B>::with_capacity(48).expect("out");
         let mut scratch =
             syndrome_engine::KeyEqScratch::with_capacity(elements.len()).expect("scratch");
         // galois may solve sequences the engine's budget rejects; on Ok the
@@ -276,7 +278,7 @@ fn galois_field_and_solver_differential() {
             let produced: Vec<u8> = out
                 .locator()
                 .coefficients()
-                .map(|c: fgf::gf8::Elem| c.to_raw())
+                .map(|c: fgf::gf8b::Elem| c.to_raw())
                 .collect();
             assert_eq!(
                 produced, expected,
@@ -308,7 +310,7 @@ fn galois_field_and_solver_differential() {
         .map(|value| value.parse::<u8>().expect("syndrome"))
         .collect();
     assert_eq!(mine.iter().map(|v| v.to_raw()).collect::<Vec<_>>(), theirs);
-    let params_b3 = syndrome_engine::RsParams::<fgf::Gf8>::new(17, 8, 3).expect("params");
+    let params_b3 = syndrome_engine::RsParams::<fgf::Gf8B>::new(17, 8, 3).expect("params");
     let mine = syndrome_engine::syndromes(&params_b3, &word_b3).expect("syndromes");
     let theirs: Vec<u8> = responses[sequences.len() + 2]
         .split_whitespace()
@@ -324,7 +326,7 @@ fn galois_field_and_solver_differential() {
         let theirs = parse_values(response);
         let mine: Vec<u8> = common::generator(params)
             .coefficients()
-            .map(|c: fgf::gf8::Elem| c.to_raw())
+            .map(|c: fgf::gf8b::Elem| c.to_raw())
             .collect();
         assert_eq!(mine, theirs);
     }

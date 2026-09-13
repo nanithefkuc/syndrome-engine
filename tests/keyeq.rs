@@ -6,12 +6,12 @@ mod common;
 
 use fgf::field::Elem;
 use fgf::kernel::FieldKernels;
-use fgf::{Gf8, Gf16, Gf32, Gf64};
+use fgf::{Gf8B, Gf16, Gf32, Gf64};
+use poly_ring::Polynomial;
 use syndrome_engine::{
     BerlekampMassey, DecodeError, Decoder, Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver,
     RsParams, syndromes,
 };
-use univariate::Polynomial;
 
 fn solve<F: FieldKernels>(
     values: &[F::Elem],
@@ -31,7 +31,7 @@ fn assert_key_equation<F: FieldKernels>(
     solve(values, &mut out, &mut scratch).expect("key equation");
 
     // Independent verification: multiply the locator by the syndrome series
-    // with univariate's truncated product and compare against the evaluator.
+    // with poly-ring's truncated product and compare against the evaluator.
     let series = Polynomial::from_coefficients(values).expect("series");
     let product = out
         .locator()
@@ -59,11 +59,11 @@ fn error_pattern<F: FieldKernels>(n: usize, k: usize, b: usize, errors: usize, s
 #[test]
 fn identity_holds_on_error_patterns_across_fields() {
     // At the correction boundary t and below it.
-    error_pattern::<Gf8>(15, 9, 1, 1, 0x501);
-    error_pattern::<Gf8>(15, 9, 1, 2, 0x502);
-    error_pattern::<Gf8>(15, 9, 1, 3, 0x503); // t = 3
-    error_pattern::<Gf8>(31, 21, 0, 5, 0x504); // t = 5
-    error_pattern::<Gf8>(17, 8, 3, 4, 0x505); // t = 4, odd redundancy
+    error_pattern::<Gf8B>(15, 9, 1, 1, 0x501);
+    error_pattern::<Gf8B>(15, 9, 1, 2, 0x502);
+    error_pattern::<Gf8B>(15, 9, 1, 3, 0x503); // t = 3
+    error_pattern::<Gf8B>(31, 21, 0, 5, 0x504); // t = 5
+    error_pattern::<Gf8B>(17, 8, 3, 4, 0x505); // t = 4, odd redundancy
     error_pattern::<Gf16>(40, 28, 1, 6, 0x506);
     error_pattern::<Gf16>(1000, 900, 0, 50, 0x507);
     error_pattern::<Gf32>(120, 100, 1, 10, 0x508);
@@ -74,14 +74,14 @@ fn identity_holds_on_error_patterns_across_fields() {
 fn identity_holds_on_randomized_patterns() {
     // Fixed-seed sweep over error counts 0..=t on several geometries.
     for errors in 0..=8 {
-        error_pattern::<Gf8>(31, 15, 1, errors, 0x600 + errors as u64);
+        error_pattern::<Gf8B>(31, 15, 1, errors, 0x600 + errors as u64);
         error_pattern::<Gf16>(60, 44, 1, errors, 0x640 + errors as u64);
     }
 }
 
 #[test]
 fn no_error_word_yields_the_unit_locator() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
     let word = common::random_codeword(&params, 0x701);
     let values = syndromes(&params, &word).expect("syndromes");
     assert_key_equation(&params, &values, 0);
@@ -89,15 +89,15 @@ fn no_error_word_yields_the_unit_locator() {
 
 #[test]
 fn multi_sequence_input_is_rejected_without_touching_scratch() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
-    let values = vec![fgf::gf8::Elem::ZERO; params.syndrome_count()];
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
+    let values = vec![fgf::gf8b::Elem::ZERO; params.syndrome_count()];
     // Distinct nonzero syndromes so a solver would be tempted to work.
     let mut state = 0x801;
     let values: Vec<_> = values
         .iter()
-        .map(|_| common::noise_elem::<Gf8>(&mut state))
+        .map(|_| common::noise_elem::<Gf8B>(&mut state))
         .collect();
-    let mut out = KeyEquation::<Gf8>::with_capacity(16).expect("out");
+    let mut out = KeyEquation::<Gf8B>::with_capacity(16).expect("out");
     let mut scratch = KeyEqScratch::with_capacity(params.syndrome_count()).expect("scratch");
     let before = format!("{scratch:?}");
     let error = Euclidean
@@ -120,16 +120,16 @@ fn dornstetter_cross_check_bm_matches_euclidean_everywhere() {
     // produce the identical normalized (Λ, Ω) pair on every decodable
     // input, across fields, geometries, offsets, and error counts.
     let check = |n: usize, k: usize, b: usize, errors: usize, seed: u64| {
-        let params = RsParams::<Gf8>::new(n, k, b).expect("params");
+        let params = RsParams::<Gf8B>::new(n, k, b).expect("params");
         let mut word = common::random_codeword(&params, seed);
         let mut positions = common::distinct_positions(n, errors, seed ^ 0x9E37);
         positions.sort();
         let mut state = seed ^ 0x85EB;
-        common::inject::<Gf8>(&mut word, &positions, &mut state);
+        common::inject::<Gf8B>(&mut word, &positions, &mut state);
         let values = syndromes(&params, &word).expect("syndromes");
-        let mut bm = KeyEquation::<Gf8>::with_capacity(params.redundancy() + 1).expect("bm");
+        let mut bm = KeyEquation::<Gf8B>::with_capacity(params.redundancy() + 1).expect("bm");
         let mut euclidean =
-            KeyEquation::<Gf8>::with_capacity(params.redundancy() + 1).expect("eea");
+            KeyEquation::<Gf8B>::with_capacity(params.redundancy() + 1).expect("eea");
         let mut scratch = KeyEqScratch::with_capacity(values.len()).expect("scratch");
         BerlekampMassey
             .solve(&[&values], &mut bm, &mut scratch)
@@ -219,14 +219,14 @@ fn dornstetter_cross_check_across_fields() {
 fn bm_locator_reproduces_the_syndrome_recurrence() {
     // The LFSR property, checked directly against the supplied sequence:
     // S_r = Σ_{i≥1} Λ_i·S_{r-i} for every r above the evaluator degree.
-    let params = RsParams::<Gf8>::new(31, 15, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(31, 15, 1).expect("params");
     let mut word = common::random_codeword(&params, 0x9A0);
     let mut positions = common::distinct_positions(31, 8, 0x9A1);
     positions.sort();
     let mut state = 0x9A2;
-    common::inject::<Gf8>(&mut word, &positions, &mut state);
+    common::inject::<Gf8B>(&mut word, &positions, &mut state);
     let values = syndromes(&params, &word).expect("syndromes");
-    let mut out = KeyEquation::<Gf8>::with_capacity(32).expect("out");
+    let mut out = KeyEquation::<Gf8B>::with_capacity(32).expect("out");
     let mut scratch = KeyEqScratch::with_capacity(values.len()).expect("scratch");
     BerlekampMassey
         .solve(&[&values], &mut out, &mut scratch)
@@ -235,7 +235,7 @@ fn bm_locator_reproduces_the_syndrome_recurrence() {
     let locator: Vec<_> = out.locator().coefficients().collect();
     let evaluator_degree = out.evaluator().coefficient_count();
     for r in evaluator_degree..values.len() {
-        let mut predicted = fgf::gf8::Elem(0);
+        let mut predicted = fgf::gf8b::Elem::from_raw(0);
         for i in 1..locator.len() {
             if r >= i {
                 predicted = predicted.add(locator[i].mul(values[r - i]));
@@ -250,13 +250,13 @@ fn end_to_end_decode_is_byte_identical_across_solvers() {
     // The Dornstetter equivalence promoted from the locator to the whole
     // decode: the pipeline returns identical outcomes with each backend.
     let check = |n: usize, k: usize, b: usize, errors: usize, seed: u64| {
-        let params = RsParams::<Gf8>::new(n, k, b).expect("params");
+        let params = RsParams::<Gf8B>::new(n, k, b).expect("params");
         let sent = common::random_codeword(&params, seed);
         let mut received = sent.clone();
         let mut positions = common::distinct_positions(n, errors, seed ^ 0x9E37);
         positions.sort();
         let mut state = seed ^ 0x85EB;
-        common::inject::<Gf8>(&mut received, &positions, &mut state);
+        common::inject::<Gf8B>(&mut received, &positions, &mut state);
 
         let mut via_bm = received.clone();
         let mut via_euclidean = received.clone();

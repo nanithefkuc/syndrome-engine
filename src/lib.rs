@@ -4,7 +4,7 @@
 //! > Field arithmetic and byte-buffer vector primitives come from `fgf` —
 //! > never re-implement them here. Polynomial evaluation, division, gcd,
 //! > extended-Euclid, formal derivative, and root-finding come from
-//! > `univariate` — never re-host them here. Pure-erasure decoding, wire
+//! > `poly-ring` — never re-host them here. Pure-erasure decoding, wire
 //! > formats, shard ownership, code-parameter selection, and soft-decision
 //! > reliability processing belong to consumers. This crate receives a
 //! > corrupted word and returns the corrections.
@@ -17,11 +17,11 @@
 //! classical bounded-distance pipeline:
 //!
 //! 1. **Syndromes** `S_j = R(α^{b+j})` — one multipoint evaluation of the
-//!    received word through `univariate`.
+//!    received word through `poly-ring`.
 //! 2. **Key equation** `Λ(x)·S(x) ≡ Ω(x) (mod x^{n-k})` solved for the
 //!    error-locator `Λ` and error-evaluator `Ω` — by Berlekamp–Massey
 //!    (engine-native LFSR synthesis over the syndrome sequence) or by the
-//!    Euclidean/Sugiyama backend composing `univariate`'s truncated EEA. The
+//!    Euclidean/Sugiyama backend composing `poly-ring`'s truncated EEA. The
 //!    two are Dornstetter-equivalent and cross-checked on every fixture.
 //! 3. **Chien search** — the locator is evaluated at the inverse error
 //!    locators `α^{-p}` of every code position `p`; the vanishing positions
@@ -31,7 +31,7 @@
 //!    inversion of the denominators.
 //!
 //!
-//! `fgf`'s and every polynomial pass is `univariate`'s. The single exception
+//! `fgf`'s and every polynomial pass is `poly-ring`'s. The single exception
 //! is Berlekamp–Massey, which synthesizes an LFSR over a scalar *syndrome
 //! sequence* — a decoder concept, not a polynomial.
 //!

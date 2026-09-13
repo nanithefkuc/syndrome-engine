@@ -7,8 +7,8 @@
 
 use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
+use poly_ring::Polynomial;
 use syndrome_engine::RsParams;
-use univariate::Polynomial;
 
 /// One LCG step, matching `fgf`'s `noise(len, seed)` convention.
 pub fn advance(state: &mut u64) -> u64 {
@@ -71,6 +71,7 @@ pub fn random_codeword<F: FieldKernels>(params: &RsParams<F>, seed: u64) -> Vec<
 /// Per-point Horner syndrome oracle: evaluates `R(x)` at each `α^{b+j}` by
 /// an explicit high-to-low coefficient sweep, sharing no code with the
 /// subproduct-tree production path.
+#[allow(clippy::chunks_exact_to_as_chunks)] // `as_chunks` cannot take a generic parameter's associated const
 pub fn horner_syndromes<F: FieldKernels>(params: &RsParams<F>, received: &[u8]) -> Vec<F::Elem> {
     let coefficients: Vec<F::Elem> = received.chunks_exact(F::BYTES).map(F::read).collect();
     let alpha = <F as Field>::GENERATOR;

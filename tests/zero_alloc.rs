@@ -8,31 +8,29 @@
 //! through the measured crossover (`cost::BM_EUCLIDEAN_CROSSOVER`, see
 //! `BENCHMARKS.md`), so every default decode in the parity band is
 //! allocation-free — asserted here. Past the threshold it dispatches to the
-//! Euclidean backend, which composes `univariate`'s allocating
+//! Euclidean backend, which composes `poly-ring`'s allocating
 //! `truncated_eea` by design; that path is the latency choice, not the
 //! zero-allocation choice.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use fgf::kernel::FieldKernels;
-use fgf::{Gf8, Gf16};
+use fgf::{Gf8B, Gf16};
 use syndrome_engine::{Decoder, Euclidean, RsParams};
 
 struct CountingAllocator;
 
 thread_local! {
     static COUNTING: Cell<bool> = const { Cell::new(false) };
+    static COUNT: Cell<usize> = const { Cell::new(0) };
 }
-
-static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let pointer = unsafe { System.alloc(layout) };
         if !pointer.is_null() && COUNTING.with(Cell::get) {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+            COUNT.with(|count| count.set(count.get() + 1));
         }
         pointer
     }
@@ -46,13 +44,14 @@ unsafe impl GlobalAlloc for CountingAllocator {
 static GLOBAL: CountingAllocator = CountingAllocator;
 
 fn count_allocations<F: FnMut()>(mut operation: F) -> usize {
-    ALLOCATIONS.store(0, Ordering::Relaxed);
+    COUNT.with(|count| count.set(0));
     COUNTING.with(|counting| counting.set(true));
     operation();
     COUNTING.with(|counting| counting.set(false));
-    ALLOCATIONS.load(Ordering::Relaxed)
+    COUNT.with(Cell::get)
 }
 
+#[allow(clippy::chunks_exact_to_as_chunks)] // `as_chunks` cannot take a generic parameter's associated const
 fn warmed_word<F: FieldKernels>(n: usize, seed: u64) -> Vec<u8> {
     let mut state = seed;
     let mut bytes = vec![0_u8; n * F::BYTES];
@@ -69,13 +68,18 @@ fn warmed_word<F: FieldKernels>(n: usize, seed: u64) -> Vec<u8> {
 
 #[test]
 fn steady_state_syndrome_pass_allocates_nothing() {
-    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(31, 21, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
-    let word = warmed_word::<Gf8>(31, 0x2A00);
+    let word = warmed_word::<Gf8B>(31, 0x2A00);
     decoder
         .syndromes_into(&word, &mut scratch)
         .expect("warm syndromes");
+    // Second warm pass: the ring's subproduct pools settle their internal
+    // shapes on the second build, as in the decode test below.
+    decoder
+        .syndromes_into(&word, &mut scratch)
+        .expect("warm syndromes again");
 
     let allocations = count_allocations(|| {
         decoder
@@ -91,6 +95,9 @@ fn steady_state_syndrome_pass_allocates_nothing() {
     decoder
         .syndromes_into(&word, &mut scratch)
         .expect("warm syndromes");
+    decoder
+        .syndromes_into(&word, &mut scratch)
+        .expect("warm syndromes again");
     let allocations = count_allocations(|| {
         decoder
             .syndromes_into(&word, &mut scratch)
@@ -109,7 +116,7 @@ fn steady_state_decode_allocates_nothing() {
     // warm the scratch with two decodes (see the comment at the second
     // warm call), then the next decode over the same geometry must not
     // allocate.
-    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(31, 21, 1).expect("params");
     let decoder = Decoder::new(params, BerlekampMassey);
     let mut scratch = decoder.scratch().expect("scratch");
     let sent = common::random_codeword(&params, 0x2B00);
@@ -119,7 +126,7 @@ fn steady_state_decode_allocates_nothing() {
     word[30] ^= 0xFF;
     let outcome = decoder.decode_into(&mut word, &mut scratch).expect("warm");
     assert_eq!(outcome.error_count(), 3);
-    // Second warm pass: the first sizes every pool, and `univariate`'s
+    // Second warm pass: the first sizes every pool, and `poly-ring`'s
     // subproduct pools settle their internal shapes on the second build.
     // The measured steady state is the converged one.
     decoder
@@ -157,7 +164,7 @@ fn steady_state_decode_allocates_nothing() {
 fn steady_state_erasure_decode_allocates_nothing() {
     use syndrome_engine::BerlekampMassey;
 
-    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(31, 21, 1).expect("params");
     let decoder = Decoder::new(params, BerlekampMassey);
     let mut scratch = decoder.scratch().expect("scratch");
     let sent = common::random_codeword(&params, 0x2C00);
@@ -189,7 +196,7 @@ fn steady_state_erasure_decode_allocates_nothing() {
 fn bisect_allocating_stage() {
     use syndrome_engine::BerlekampMassey;
     // Which stage allocates on the second pure decode?
-    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(31, 21, 1).expect("params");
     let decoder = Decoder::new(params, BerlekampMassey);
     let mut scratch = decoder.scratch().expect("scratch");
     let sent = common::random_codeword(&params, 0x2D00);
@@ -211,7 +218,7 @@ fn bisect_allocating_stage() {
 fn bisect_erasure_stage() {
     use syndrome_engine::BerlekampMassey;
 
-    let params = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(31, 21, 1).expect("params");
     let decoder = Decoder::new(params, BerlekampMassey);
     let mut scratch = decoder.scratch().expect("scratch");
     let sent = common::random_codeword(&params, 0x2C00);

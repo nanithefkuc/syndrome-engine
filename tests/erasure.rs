@@ -6,7 +6,7 @@ mod common;
 
 use fgf::field::Elem;
 use fgf::kernel::FieldKernels;
-use fgf::{Gf8, Gf16, Gf32, Gf64};
+use fgf::{Gf8B, Gf16, Gf32, Gf64};
 use syndrome_engine::{DecodeError, Decoder, Euclidean, RsParams, syndromes};
 
 /// Inject `errors` unflagged and `erasures` flagged corruptions, decode
@@ -73,11 +73,11 @@ fn mixed_case<F: FieldKernels>(
 #[test]
 fn mixed_patterns_decode_at_the_boundary() {
     // 2ν + ρ = d - 1 = n - k exactly, across fields and offsets.
-    mixed_case::<Gf8>(15, 9, 1, 3, 0, 0x2001); // pure errors, 2·3 = 6
-    mixed_case::<Gf8>(15, 9, 1, 2, 2, 0x2002); // 4 + 2 = 6
-    mixed_case::<Gf8>(15, 9, 1, 1, 4, 0x2003); // 2 + 4 = 6
-    mixed_case::<Gf8>(15, 9, 1, 0, 6, 0x2004); // erasures only
-    mixed_case::<Gf8>(17, 8, 3, 3, 3, 0x2005); // odd redundancy: 6 + 3 = 9
+    mixed_case::<Gf8B>(15, 9, 1, 3, 0, 0x2001); // pure errors, 2·3 = 6
+    mixed_case::<Gf8B>(15, 9, 1, 2, 2, 0x2002); // 4 + 2 = 6
+    mixed_case::<Gf8B>(15, 9, 1, 1, 4, 0x2003); // 2 + 4 = 6
+    mixed_case::<Gf8B>(15, 9, 1, 0, 6, 0x2004); // erasures only
+    mixed_case::<Gf8B>(17, 8, 3, 3, 3, 0x2005); // odd redundancy: 6 + 3 = 9
     mixed_case::<Gf16>(40, 28, 1, 4, 4, 0x2006);
     mixed_case::<Gf32>(120, 100, 1, 6, 2, 0x2007);
     mixed_case::<Gf64>(60, 40, 1, 8, 4, 0x2008);
@@ -85,7 +85,7 @@ fn mixed_patterns_decode_at_the_boundary() {
 
 #[test]
 fn one_past_the_boundary_fails_typed() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params"); // budget 6
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params"); // budget 6
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let sent = common::random_codeword(&params, 0x2100);
@@ -96,8 +96,8 @@ fn one_past_the_boundary_fails_typed() {
     error_positions.retain(|position| !erasure_positions.contains(position));
     error_positions.sort();
     let mut state = 0x2102;
-    common::inject::<Gf8>(&mut received, &error_positions, &mut state);
-    common::inject::<Gf8>(&mut received, &erasure_positions, &mut state);
+    common::inject::<Gf8B>(&mut received, &error_positions, &mut state);
+    common::inject::<Gf8B>(&mut received, &erasure_positions, &mut state);
     // Past the budget the outcome is either a typed detection or — when
     // the word happens to sit inside another codeword's decoding sphere —
     // a valid but different codeword, which no syndrome check can detect.
@@ -124,13 +124,13 @@ fn one_past_the_boundary_fails_typed() {
 fn erasure_free_path_is_byte_identical_to_pure_path() {
     // Degenerate agreement: ρ = 0 collapses the modified syndromes onto
     // the ordinary ones.
-    let params = RsParams::<Gf8>::new(21, 13, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(21, 13, 1).expect("params");
     let sent = common::random_codeword(&params, 0x2200);
     let mut received = sent.clone();
     let mut positions = common::distinct_positions(21, 4, 0x2201);
     positions.sort();
     let mut state = 0x2202;
-    common::inject::<Gf8>(&mut received, &positions, &mut state);
+    common::inject::<Gf8B>(&mut received, &positions, &mut state);
 
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
@@ -192,7 +192,7 @@ fn syndromes_of_corrupted<F: FieldKernels>(
 
 #[test]
 fn erasure_validation_errors_are_typed() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let mut word = vec![0_u8; 15];
@@ -227,7 +227,7 @@ fn erasure_magnitudes_match_forney_formula_independently() {
     // An erased-but-intact position (zero channel magnitude) stays in the
     // reported set with a zero magnitude: the locator includes it, the
     // syndrome contribution does not.
-    let params = RsParams::<Gf8>::new(21, 13, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(21, 13, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let sent = common::random_codeword(&params, 0x2400);
@@ -235,13 +235,13 @@ fn erasure_magnitudes_match_forney_formula_independently() {
     let erasure_positions = [2usize, 9, 20];
     // Corrupt only position 9; positions 2 and 20 are flagged but intact.
     let mut state = 0x2401;
-    let magnitudes = common::inject::<Gf8>(&mut received, &[9], &mut state);
+    let magnitudes = common::inject::<Gf8B>(&mut received, &[9], &mut state);
     let outcome = decoder
         .decode_with_erasures_into(&mut received, &erasure_positions, &mut scratch)
         .expect("decode");
     assert_eq!(outcome.positions(), erasure_positions.as_slice());
-    assert_eq!(outcome.magnitudes()[0], fgf::gf8::Elem(0));
+    assert_eq!(outcome.magnitudes()[0], fgf::gf8b::Elem::from_raw(0));
     assert_eq!(outcome.magnitudes()[1], magnitudes[0]);
-    assert_eq!(outcome.magnitudes()[2], fgf::gf8::Elem(0));
+    assert_eq!(outcome.magnitudes()[2], fgf::gf8b::Elem::from_raw(0));
     assert_eq!(received, sent);
 }

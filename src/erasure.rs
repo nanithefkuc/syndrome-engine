@@ -21,7 +21,7 @@ use alloc::vec::Vec;
 
 use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
-use univariate::Polynomial;
+use poly_ring::Polynomial;
 
 use crate::error::DecodeError;
 use crate::params::RsParams;
@@ -43,7 +43,7 @@ pub fn locator_into<F: FieldKernels>(
     locator.assign_coefficients(&[F::Elem::ONE])?;
     for &position in positions {
         // Γ ← Γ + X_f·x·Γ = Γ·(1 + X_f·x): one scaled-shift fold per
-        // erased position, composed from `univariate`'s ring primitives.
+        // erased position, composed from `poly-ring`'s ring primitives.
         let erasure_locator = <F as Field>::GENERATOR.pow(position as u64);
         swap.assign_from(locator);
         swap.add_scaled_shifted_assign(erasure_locator, locator, 1)?;

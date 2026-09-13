@@ -1,4 +1,4 @@
-//! The Sugiyama/Euclidean key-equation backend, composing `univariate`'s
+//! The Sugiyama/Euclidean key-equation backend, composing `poly-ring`'s
 //! truncated EEA.
 //!
 //! The extended Euclidean algorithm on `(x^{N}, S(x))`, stopped at the first
@@ -10,19 +10,19 @@
 //! sequence.
 //!
 //! No polynomial-division or cofactor loop lives here (S1): the engine
-//! supplies the operands and the stopping rule, `univariate` supplies the
+//! supplies the operands and the stopping rule, `poly-ring` supplies the
 //! arithmetic.
 
 use fgf::field::Elem;
 use fgf::kernel::FieldKernels;
-use univariate::truncated_eea;
+use poly_ring::truncated_eea;
 
 use crate::error::DecodeError;
 use crate::keyeq::{KeyEqScratch, KeyEquation, KeyEquationSolver};
 
 /// The Euclidean/Sugiyama key-equation backend.
 ///
-/// Composes [`univariate::truncated_eea`] and therefore allocates through
+/// Composes [`poly_ring::truncated_eea`] and therefore allocates through
 /// its internal buffers; it is the permanent cross-check against
 /// [`crate::BerlekampMassey`] (allocation-free in its steady state) rather
 /// than the hot path.
@@ -102,9 +102,9 @@ pub(crate) fn validate<F: FieldKernels>(
 /// Map an upstream polynomial failure to the decode error domain. These
 /// paths can only fail on buffer reservation; the context distinguishes the
 /// operand stage from the arithmetic itself.
-pub(crate) fn map_error(error: univariate::PolynomialError) -> DecodeError {
+pub(crate) fn map_error(error: poly_ring::PolynomialError) -> DecodeError {
     let context = match error {
-        univariate::PolynomialError::Config(_) => "key-equation polynomial buffer",
+        poly_ring::PolynomialError::Config(_) => "key-equation polynomial buffer",
         _ => "key-equation arithmetic",
     };
     DecodeError::AllocationFailed { context }

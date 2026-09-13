@@ -1,7 +1,7 @@
 //! Berlekamp–Massey: LFSR synthesis over the scalar syndrome sequence.
 //!
 //! The one algorithm this crate owns outright rather than composing
-//! `univariate` (settled decision #2): its input is a *sequence* — a
+//! `poly-ring` (settled decision #2): its input is a *sequence* — a
 //! decoder concept — not a polynomial. The algorithm runs `N` iterations,
 //! each computing a discrepancy `δ = S_r + Σ_{i≥1} Λ_i S_{r-i}` with an
 //! explicit `is_zero()` test (S7), and on a nonzero discrepancy updates

@@ -57,17 +57,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: normal dependencies carry fgf and univariate only
+      - name: normal dependencies carry fgf and poly-ring only
         run: |
           cargo tree --depth 1 -e normal | tee tree.txt
           grep -q fgf tree.txt
-          grep -q univariate tree.txt
+          grep -q poly-ring tree.txt
           ! grep -Eq 'gfm|butterfly-fft|sgraph|lattica|archmage|simdispatch|rayon' tree.txt
       - name: no-default-features carries the same pair, no std
         run: |
           cargo tree --depth 1 -e normal --no-default-features | tee tree-core.txt
           grep -q fgf tree-core.txt
-          grep -q univariate tree-core.txt
+          grep -q poly-ring tree-core.txt
           ! grep -Eq 'gfm|butterfly-fft|sgraph|lattica|archmage|simdispatch|rayon' tree-core.txt
 
   backends:

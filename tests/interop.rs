@@ -12,7 +12,7 @@
 mod common;
 
 use fgf::field::Elem;
-use fgf::{Gf8, Gf16};
+use fgf::{Gf8B, Gf16};
 use syndrome_engine::{Decoder, Euclidean, RsParams, syndromes};
 
 const GF8_15_9_1_SENT: [u8; 15] = [
@@ -55,7 +55,7 @@ const GF8_17_8_3_MAGNITUDES: [u8; 4] = [0x44, 0x43, 0x16, 0x2D];
 
 #[test]
 fn gf8_narrow_sense_fixture_decodes() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
 
@@ -94,7 +94,7 @@ fn gf16_narrow_sense_fixture_decodes() {
 fn offset_three_odd_redundancy_fixture_decodes() {
     // b = 3 with odd redundancy: the consecutive-root offset is part of the
     // frozen convention, not an afterthought.
-    let params = RsParams::<Gf8>::new(17, 8, 3).expect("params");
+    let params = RsParams::<Gf8B>::new(17, 8, 3).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let mut word = GF8_17_8_3_RECEIVED;
@@ -111,7 +111,7 @@ fn offset_three_odd_redundancy_fixture_decodes() {
 fn fixture_words_are_codewords() {
     // The sent vectors themselves must be zero-syndrome codewords under the
     // frozen convention; otherwise the fixtures pin nothing.
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
     assert!(
         syndromes(&params, &GF8_15_9_1_SENT)
             .expect("syndromes")
@@ -125,7 +125,7 @@ fn fixture_words_are_codewords() {
             .iter()
             .all(|value| value.is_zero())
     );
-    let params = RsParams::<Gf8>::new(17, 8, 3).expect("params");
+    let params = RsParams::<Gf8B>::new(17, 8, 3).expect("params");
     assert!(
         syndromes(&params, &GF8_17_8_3_SENT)
             .expect("syndromes")
@@ -150,7 +150,7 @@ const GF8_21_13_1_MIXED_MAGNITUDES: [u8; 5] = [0xA6, 0x48, 0xF7, 0x7D, 0xBA];
 fn mixed_errors_and_erasures_fixture_decodes() {
     // Freezes the Forney-syndrome convention: 2 errors + 3 erasures at
     // 2ν + ρ = 7 = d - 1, one unit inside the budget.
-    let params = RsParams::<Gf8>::new(21, 13, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(21, 13, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let mut word = GF8_21_13_1_MIXED_RECEIVED;

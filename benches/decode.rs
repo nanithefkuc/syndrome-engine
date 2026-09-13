@@ -8,12 +8,12 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use fgf::Gf16;
 use fgf::field::{Elem, Field};
+use poly_ring::{ChienScratch, MultipointScratch, Polynomial, chien_roots_into};
 use syndrome_engine::stages::{batch_invert_into, locate_into};
 use syndrome_engine::{
     BerlekampMassey, Decoder, Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver, RsParams,
     syndromes,
 };
-use univariate::{ChienScratch, MultipointScratch, Polynomial, chien_roots_into};
 
 fn generator<F: fgf::kernel::FieldKernels>(params: &RsParams<F>) -> Polynomial<F> {
     let alpha = <F as Field>::GENERATOR;
@@ -159,7 +159,7 @@ fn bench_locate(criterion: &mut Criterion) {
         });
     });
 
-    // The whole-field `univariate` Chien scan for reference, same locator.
+    // The whole-field `poly-ring` Chien scan for reference, same locator.
     let mut chien = ChienScratch::<Gf16>::new();
     let mut roots = Vec::new();
     chien_roots_into(out.locator(), &mut chien, &mut roots).expect("warm");
@@ -173,7 +173,7 @@ fn bench_locate(criterion: &mut Criterion) {
 fn bench_forney(criterion: &mut Criterion) {
     // Batch inversion of 60 denominators — the Forney kernel in isolation.
     let mut values: Vec<fgf::gf16::Elem> = (1..=60)
-        .map(|index| fgf::gf16::Elem(u16::try_from(index * 37 + 1).expect("nonzero")))
+        .map(|index| fgf::gf16::Elem::from_raw(u16::try_from(index * 37 + 1).expect("nonzero")))
         .collect();
     let mut prefix = Vec::new();
     batch_invert_into::<Gf16>(&mut values, &mut prefix);

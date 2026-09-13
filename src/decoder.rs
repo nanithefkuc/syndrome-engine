@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
-use univariate::{MultipointScratch, Polynomial};
+use poly_ring::{MultipointScratch, Polynomial};
 
 use crate::erasure;
 use crate::error::{ConfigError, DecodeError};
@@ -165,7 +165,7 @@ fn reserved_positions(capacity: usize, context: &'static str) -> Result<Vec<usiz
 /// The default solver is [`crate::Adaptive`]: Berlekamp–Massey (the
 /// allocation-free LFSR synthesis) on the hot path, with the Euclidean
 /// backend past the measured crossover; [`crate::Euclidean`] composes
-/// `univariate`'s allocating truncated EEA and is the cross-check backend.
+/// `poly-ring`'s allocating truncated EEA and is the cross-check backend.
 pub struct Decoder<F: FieldKernels, S: KeyEquationSolver<F> = crate::cost::Adaptive> {
     params: RsParams<F>,
     solver: S,

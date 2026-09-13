@@ -16,7 +16,7 @@ unknown positions.
 > `syndrome-engine` is a decoder, not a codec and not a polynomial ring.
 > Field arithmetic and byte-buffer vector primitives come from `fgf` — never
 > re-implemented here. Polynomial evaluation, division, gcd, extended-Euclid,
-> formal derivative, and root-finding come from `univariate` — never
+> formal derivative, and root-finding come from `poly-ring` — never
 > re-hosted here. Pure-erasure decoding, wire formats, shard ownership,
 > code-parameter selection, and soft-decision reliability processing belong
 > to consumers. This crate receives a corrupted word and returns the
@@ -33,10 +33,10 @@ locator degree and the corrected word must re-encode to all-zero syndromes.
 ## Usage
 
 ```rust
-use fgf::Gf8;
+use fgf::Gf8B;
 use syndrome_engine::{BerlekampMassey, Decoder, RsParams};
 
-let params = RsParams::<Gf8>::new(255, 223, 1).unwrap();
+let params = RsParams::<Gf8B>::new(255, 223, 1).unwrap();
 let decoder = Decoder::new(params, BerlekampMassey);
 let mut scratch = decoder.scratch().unwrap();
 
@@ -57,9 +57,9 @@ Erasures are known-bad positions; hand them in and the budget widens to
 `2·(errors) + (erasures) ≤ n - k`:
 
 ```rust
-# use fgf::Gf8;
+# use fgf::Gf8B;
 # use syndrome_engine::{BerlekampMassey, Decoder, RsParams};
-# let params = RsParams::<Gf8>::new(255, 223, 1).unwrap();
+# let params = RsParams::<Gf8B>::new(255, 223, 1).unwrap();
 # let decoder = Decoder::new(params, BerlekampMassey);
 # let mut scratch = decoder.scratch().unwrap();
 # let mut received = [0u8; 255];
@@ -69,15 +69,15 @@ let outcome = decoder
     .unwrap();
 ```
 
-The engine is generic over `fgf`'s binary fields — `Gf8` (AES `0x11B`),
+The engine is generic over `fgf`'s binary fields — `Gf8B` (AES `0x11B`),
 `Gf16`, `Gf32`, `Gf64` — with the primitive element `F::GENERATOR` and the
-syndrome offset `b` frozen per decoder. (When `fgf`'s `Gf8B`/`Gf8D` field
-split lands and `univariate` re-pins it, `Gf8D` — the classical `0x11D` RS
-field — joins the matrix with a one-line rev swap.) Both key-equation
-backends are available behind the `KeyEquationSolver` trait; they are
-Dornstetter-equivalent and cross-checked against each other (and against a
-textbook Peterson–Gorenstein–Zierler oracle in the test suite) on every
-fixture.
+syndrome offset `b` frozen per decoder. (Now that `fgf`'s `Gf8B`/`Gf8D`
+field split has landed and been re-pinned here, `Gf8D` — the classical
+`0x11D` RS field — joins the matrix with a one-line test-matrix addition.)
+Both key-equation backends are available behind the `KeyEquationSolver`
+trait; they are Dornstetter-equivalent and cross-checked against each other
+(and against a textbook Peterson–Gorenstein–Zierler oracle in the test
+suite) on every fixture.
 
 Consumers that already hold syndromes (`reliability-engine` recomputes them
 far more often than words) skip the evaluation pass with
@@ -95,9 +95,9 @@ global allocator in `tests/zero_alloc.rs`, not asserted in prose.
 | `internals` | no | unstable benchmarking surface, no compatibility promise |
 
 `--no-default-features` builds the engine `no_std` with scalar field
-arithmetic. The runtime dependency set is exactly `{fgf, univariate}` — no
+arithmetic. The runtime dependency set is exactly `{fgf, poly-ring}` — no
 `gfm` (the key equation replaces the Peterson matrix solve) and no
-`butterfly-fft` (syndrome decoding is coefficient-domain; `univariate` is
+`butterfly-fft` (syndrome decoding is coefficient-domain; `poly-ring` is
 built without its `fft` feature). CI asserts the tree shape.
 
 ## Building

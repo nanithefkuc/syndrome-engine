@@ -6,12 +6,12 @@ mod common;
 
 use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
-use fgf::{Gf8, Gf16, Gf32, Gf64};
+use fgf::{Gf8B, Gf16, Gf32, Gf64};
+use poly_ring::Polynomial;
 use syndrome_engine::{
     DecodeError, Decoder, Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver, RsParams,
     syndromes,
 };
-use univariate::Polynomial;
 
 fn decode_case<F: FieldKernels>(n: usize, k: usize, b: usize, errors: usize, seed: u64) {
     let params = RsParams::<F>::new(n, k, b).expect("params");
@@ -65,12 +65,12 @@ fn decode_case<F: FieldKernels>(n: usize, k: usize, b: usize, errors: usize, see
 
 #[test]
 fn decodes_at_and_below_the_boundary() {
-    decode_case::<Gf8>(15, 9, 1, 0, 0x1001);
-    decode_case::<Gf8>(15, 9, 1, 1, 0x1002);
-    decode_case::<Gf8>(15, 9, 1, 3, 0x1003); // t = 3
-    decode_case::<Gf8>(31, 21, 0, 5, 0x1004);
-    decode_case::<Gf8>(17, 8, 3, 4, 0x1005); // odd redundancy, t = 4
-    decode_case::<Gf8>(255, 223, 1, 16, 0x1006);
+    decode_case::<Gf8B>(15, 9, 1, 0, 0x1001);
+    decode_case::<Gf8B>(15, 9, 1, 1, 0x1002);
+    decode_case::<Gf8B>(15, 9, 1, 3, 0x1003); // t = 3
+    decode_case::<Gf8B>(31, 21, 0, 5, 0x1004);
+    decode_case::<Gf8B>(17, 8, 3, 4, 0x1005); // odd redundancy, t = 4
+    decode_case::<Gf8B>(255, 223, 1, 16, 0x1006);
     decode_case::<Gf16>(40, 28, 1, 6, 0x1007);
     decode_case::<Gf16>(1000, 900, 0, 50, 0x1008);
     decode_case::<Gf32>(120, 100, 1, 10, 0x1009);
@@ -80,7 +80,7 @@ fn decodes_at_and_below_the_boundary() {
 #[test]
 fn decodes_randomized_patterns_across_the_radius() {
     for errors in 0..=6 {
-        decode_case::<Gf8>(31, 19, 1, errors, 0x1100 + errors as u64);
+        decode_case::<Gf8B>(31, 19, 1, errors, 0x1100 + errors as u64);
         decode_case::<Gf16>(60, 44, 1, errors, 0x1140 + errors as u64);
     }
 }
@@ -122,7 +122,7 @@ fn beyond_the_sphere_fails_typed_and_leaves_the_word_untouched() {
 
 #[test]
 fn wrong_word_length_is_rejected() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let mut word = vec![0_u8; 14];
@@ -139,8 +139,8 @@ fn wrong_word_length_is_rejected() {
 
 #[test]
 fn scratch_from_another_geometry_is_rejected() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
-    let other = RsParams::<Gf8>::new(31, 21, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
+    let other = RsParams::<Gf8B>::new(31, 21, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut foreign = Decoder::new(other, Euclidean).scratch().expect("scratch");
     let mut word = vec![0_u8; 15];
@@ -157,7 +157,7 @@ fn scratch_from_another_geometry_is_rejected() {
 
 #[test]
 fn decode_from_syndromes_recovers_the_pattern() {
-    let params = RsParams::<Gf8>::new(21, 13, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(21, 13, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let sent = common::random_codeword(&params, 0x1400);
@@ -165,7 +165,7 @@ fn decode_from_syndromes_recovers_the_pattern() {
     let mut positions = common::distinct_positions(21, 4, 0x1401);
     positions.sort();
     let mut state = 0x1402;
-    let magnitudes = common::inject::<Gf8>(&mut received, &positions, &mut state);
+    let magnitudes = common::inject::<Gf8B>(&mut received, &positions, &mut state);
     let values = syndromes(&params, &received).expect("syndromes");
     let outcome = decoder
         .decode_syndromes_into(&values, &mut scratch)
@@ -176,10 +176,10 @@ fn decode_from_syndromes_recovers_the_pattern() {
 
 #[test]
 fn decode_from_syndromes_checks_the_count() {
-    let params = RsParams::<Gf8>::new(15, 9, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 9, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
-    let values = vec![fgf::gf8::Elem(0); 5];
+    let values = vec![fgf::gf8b::Elem::from_raw(0); 5];
     assert_eq!(
         decoder
             .decode_syndromes_into(&values, &mut scratch)
@@ -193,7 +193,7 @@ fn decode_from_syndromes_checks_the_count() {
 
 #[test]
 fn zero_redundancy_code_decodes_trivially() {
-    let params = RsParams::<Gf8>::new(7, 7, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(7, 7, 1).expect("params");
     let decoder = Decoder::new(params, Euclidean);
     let mut scratch = decoder.scratch().expect("scratch");
     let mut word = vec![1_u8, 2, 3, 4, 5, 6, 7];
@@ -212,15 +212,15 @@ fn solver_is_total_on_arbitrary_sequences() {
     // be total, and any pair it returns must satisfy the identity.
     let mut state = 0x1600_u64;
     for _ in 0..32 {
-        let values: Vec<fgf::gf8::Elem> = (0..12)
+        let values: Vec<fgf::gf8b::Elem> = (0..12)
             .map(|_| {
                 state = state
                     .wrapping_mul(6_364_136_223_846_793_005)
                     .wrapping_add(1_442_695_040_888_963_407);
-                fgf::gf8::Elem(state as u8)
+                fgf::gf8b::Elem::from_raw(state as u8)
             })
             .collect();
-        let mut out = KeyEquation::<Gf8>::with_capacity(16).expect("out");
+        let mut out = KeyEquation::<Gf8B>::with_capacity(16).expect("out");
         let mut scratch = KeyEqScratch::with_capacity(values.len()).expect("scratch");
         if let Ok(()) = Euclidean.solve(&[&values], &mut out, &mut scratch) {
             let series = Polynomial::from_coefficients(&values).expect("series");

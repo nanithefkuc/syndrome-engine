@@ -4,7 +4,7 @@
 //! at degree `p`) are the `n - k` point evaluations
 //! `S_j = R(α^{b+j})` at the code's consecutive roots. The engine owns the
 //! index convention (offset `b`, primitive element `α = F::GENERATOR`,
-//! low-degree-first coefficient order); the arithmetic is `univariate`'s
+//! low-degree-first coefficient order); the arithmetic is `poly-ring`'s
 //! multipoint evaluation — never a private Horner loop.
 //!
 //! The defining property: an uncorrupted codeword vanishes at every
@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 
 use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
-use univariate::{MultipointScratch, Polynomial, evaluate_multipoint_into};
+use poly_ring::{MultipointScratch, Polynomial, evaluate_multipoint_into};
 
 use crate::error::DecodeError;
 use crate::params::RsParams;

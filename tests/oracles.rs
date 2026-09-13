@@ -10,11 +10,11 @@ mod common;
 use common::{brute_force_magnitudes, gaussian_solve, pgz_locator};
 use fgf::field::Field;
 use fgf::kernel::FieldKernels;
-use fgf::{Gf8, Gf16};
+use fgf::{Gf8B, Gf16};
+use poly_ring::Polynomial;
 use syndrome_engine::{
     Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver, RsParams, syndromes,
 };
-use univariate::Polynomial;
 
 fn fixture<F: FieldKernels>(n: usize, k: usize, b: usize, errors: usize, seed: u64) {
     let params = RsParams::<F>::new(n, k, b).expect("params");
@@ -52,9 +52,9 @@ fn fixture<F: FieldKernels>(n: usize, k: usize, b: usize, errors: usize, seed: u
 #[test]
 fn pgz_and_brute_force_agree_with_production() {
     for errors in 1..=4 {
-        fixture::<Gf8>(15, 7, 1, errors, 0xA00 + errors as u64); // t = 4
-        fixture::<Gf8>(21, 13, 0, errors, 0xA10 + errors as u64);
-        fixture::<Gf8>(17, 8, 3, errors, 0xA20 + errors as u64);
+        fixture::<Gf8B>(15, 7, 1, errors, 0xA00 + errors as u64); // t = 4
+        fixture::<Gf8B>(21, 13, 0, errors, 0xA10 + errors as u64);
+        fixture::<Gf8B>(17, 8, 3, errors, 0xA20 + errors as u64);
         fixture::<Gf16>(40, 28, 1, errors, 0xA30 + errors as u64);
     }
 }
@@ -62,38 +62,38 @@ fn pgz_and_brute_force_agree_with_production() {
 #[test]
 fn gaussian_solve_rejects_singular_systems() {
     let matrix = vec![
-        vec![fgf::gf8::Elem(1), fgf::gf8::Elem(1)],
-        vec![fgf::gf8::Elem(1), fgf::gf8::Elem(1)],
+        vec![fgf::gf8b::Elem::from_raw(1), fgf::gf8b::Elem::from_raw(1)],
+        vec![fgf::gf8b::Elem::from_raw(1), fgf::gf8b::Elem::from_raw(1)],
     ];
-    let rhs = vec![fgf::gf8::Elem(1), fgf::gf8::Elem(0)];
-    let solved = gaussian_solve::<fgf::Gf8>(matrix, rhs);
+    let rhs = vec![fgf::gf8b::Elem::from_raw(1), fgf::gf8b::Elem::from_raw(0)];
+    let solved = gaussian_solve::<fgf::Gf8B>(matrix, rhs);
     assert!(solved.is_none());
 }
 
 #[test]
 fn locator_from_positions_matches_solver() {
     // The locator implied by the error positions — Π(1 + X_p x) built with
-    // univariate — must equal the solved locator, tying the root→position
+    // poly-ring — must equal the solved locator, tying the root→position
     // convention to the solver output.
-    let params = RsParams::<Gf8>::new(15, 7, 1).expect("params");
+    let params = RsParams::<Gf8B>::new(15, 7, 1).expect("params");
     let mut word = common::random_codeword(&params, 0xB00);
     let mut positions = common::distinct_positions(15, 3, 0xB01);
     positions.sort();
     let mut state = 0xB02;
-    common::inject::<Gf8>(&mut word, &positions, &mut state);
+    common::inject::<Gf8B>(&mut word, &positions, &mut state);
     let values = syndromes(&params, &word).expect("syndromes");
-    let mut out = KeyEquation::<Gf8>::with_capacity(8).expect("out");
+    let mut out = KeyEquation::<Gf8B>::with_capacity(8).expect("out");
 
     let mut scratch = KeyEqScratch::with_capacity(values.len()).expect("scratch");
     Euclidean
         .solve(&[&values], &mut out, &mut scratch)
         .expect("solve");
 
-    let alpha = <Gf8 as Field>::GENERATOR;
+    let alpha = <Gf8B as Field>::GENERATOR;
     // The locator implied by the positions: Π(1 + X_p x), monic at the
     // constant term. Build Π(x + X_p^{-1}) and rescale by Π X_p.
     let mut expected = Polynomial::one().expect("one");
-    let mut scale = fgf::gf8::Elem(1);
+    let mut scale = fgf::gf8b::Elem::from_raw(1);
     for &position in &positions {
         let locator = alpha.pow(position as u64);
         scale = scale.mul(locator);

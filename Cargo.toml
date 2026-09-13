@@ -11,7 +11,7 @@ exclude = ["/.github", "/.plans"]
 
 [features]
 default = ["std", "simd"]
-std = ["fgf/std", "univariate/std"]
+std = ["fgf/std", "poly-ring/std"]
 # simd implies std, as in fgf and gfm: fgf's backend cache is a LazyLock, and a
 # simd-without-std combination would compile and silently run scalar.
 simd = ["std", "fgf/simd"]
@@ -20,21 +20,21 @@ simd = ["std", "fgf/simd"]
 parallel = ["std", "dep:rayon"]
 # syndrome-engine's own unstable surface, for benchmarks and downstream
 # experimentation. Not a compatibility promise. Distinct from fgf's and
-# univariate's `internals`, which this crate deliberately does not take.
+# poly-ring's `internals`, which this crate deliberately does not take.
 internals = []
 
 [dependencies]
 # Field arithmetic and packed-buffer vector kernels, pinned by rev: a
 # floating dependency is a format-break risk when the dependency feeds wire
-# bytes. This rev matches `univariate`'s own pin so cargo resolves one copy.
-# When fgf lands the Gf8B/Gf8D field split on main and `univariate` re-pins,
-# swap both revs in the same sitting and add Gf8D to the test matrix.
-fgf = { git = "https://github.com/nanithefkuc/fgf", rev = "d0e331cec2e6ae5645e529597fa913db467a44cd" }
+# bytes. This rev matches `poly-ring`'s own pin so cargo resolves one copy.
+# Adding `Gf8D` (the classical `0x11D` RS field) to the test matrix is a
+# one-line follow-up now that fgf's field split has landed.
+fgf = { git = "https://github.com/nanithefkuc/fgf", rev = "b33b441bcff60da80354bfee6050db4aeab6295c" }
 # Every polynomial operation: syndrome evaluation, the truncated-EEA
 # key-equation primitive, Chien search, Hasse/formal derivatives. Bare
 # (`default-features = false`) so the `fft` composition and with it
 # `butterfly-fft` never enter this crate's dependency tree.
-univariate = { git = "https://github.com/nanithefkuc/univariate", rev = "487997ede763a49e68da101b3d5a08f48ffec4e4", default-features = false }
+poly-ring = { git = "https://github.com/nanithefkuc/poly-ring", rev = "091164ee4e547c54012a3cab994813c3c825d70c", default-features = false }
 rayon = { version = "1", optional = true }
 
 [dev-dependencies]

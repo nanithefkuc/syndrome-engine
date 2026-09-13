@@ -7,8 +7,8 @@
 //! the frozen half of the wire convention (S6): positions are reported in
 //! ascending order.
 //!
-//! The arithmetic is `univariate`'s multipoint evaluation over the frozen
-//! position-point set. A whole-field scan through `univariate::chien_roots`
+//! The arithmetic is `poly-ring`'s multipoint evaluation over the frozen
+//! position-point set. A whole-field scan through `poly_ring::chien_roots`
 //! would visit `|F|` elements — neither the decoder's `n`-position domain
 //! nor an affordable pass at `Gf32`/`Gf64` — so the position scan composes
 //! the same primitive the syndrome pass uses.
@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 
 use fgf::field::{Elem, Field};
 use fgf::kernel::FieldKernels;
-use univariate::{MultipointScratch, Polynomial, evaluate_multipoint_into};
+use poly_ring::{MultipointScratch, Polynomial, evaluate_multipoint_into};
 
 use crate::error::DecodeError;
 use crate::params::RsParams;

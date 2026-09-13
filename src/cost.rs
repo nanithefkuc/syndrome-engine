@@ -13,7 +13,7 @@ use crate::error::DecodeError;
 use crate::keyeq::{BerlekampMassey, Euclidean, KeyEqScratch, KeyEquation, KeyEquationSolver};
 
 /// Syndrome-sequence length through which Berlekamp–Massey's scalar
-/// recurrence beats the Euclidean backend's `univariate` truncated EEA.
+/// recurrence beats the Euclidean backend's `poly-ring` truncated EEA.
 /// Measured on the record in `BENCHMARKS.md`: Berlekamp–Massey leads
 /// through `N ≈ 48` syndromes (1.9× at `N = 10`, parity at `N = 48`) and
 /// the packed-kernel EEA wins beyond (2.2× at `N = 123`, 10× at
@@ -27,7 +27,7 @@ pub const BM_EUCLIDEAN_CROSSOVER: usize = 48;
 pub enum SolverBackend {
     /// Berlekamp–Massey LFSR synthesis over the sequence.
     BerlekampMassey,
-    /// Euclidean/Sugiyama through `univariate`'s truncated EEA.
+    /// Euclidean/Sugiyama through `poly-ring`'s truncated EEA.
     Euclidean,
 }
 
@@ -103,30 +103,30 @@ mod tests {
     #[test]
     fn adaptive_dispatches_by_sequence_length() {
         use crate::keyeq::{KeyEqScratch, KeyEquation, KeyEquationSolver};
-        use fgf::Gf8;
+        use fgf::Gf8B;
 
         // A degree-2 LFSR sequence: 1, 0, 1, 0, ... has locator 1 + x^2
         // over GF(2^8) only if the field contains the roots; instead use a
         // synthetic sequence and check totality + identity under Adaptive.
         let sequence = [
-            fgf::gf8::Elem(1),
-            fgf::gf8::Elem(2),
-            fgf::gf8::Elem(4),
-            fgf::gf8::Elem(8),
-            fgf::gf8::Elem(16),
-            fgf::gf8::Elem(32),
+            fgf::gf8b::Elem::from_raw(1),
+            fgf::gf8b::Elem::from_raw(2),
+            fgf::gf8b::Elem::from_raw(4),
+            fgf::gf8b::Elem::from_raw(8),
+            fgf::gf8b::Elem::from_raw(16),
+            fgf::gf8b::Elem::from_raw(32),
         ];
-        let mut out = KeyEquation::<Gf8>::with_capacity(8).expect("out");
+        let mut out = KeyEquation::<Gf8B>::with_capacity(8).expect("out");
         let mut scratch = KeyEqScratch::with_capacity(sequence.len()).expect("scratch");
         Adaptive
             .solve(&[&sequence], &mut out, &mut scratch)
             .expect("adaptive solve");
-        let series = univariate::Polynomial::from_coefficients(&sequence).expect("series");
+        let series = poly_ring::Polynomial::from_coefficients(&sequence).expect("series");
         let product = out
             .locator()
             .multiply_truncated(&series, sequence.len())
             .expect("product");
         assert_eq!(&product, out.evaluator());
-        assert_eq!(out.locator().coefficient(0), fgf::gf8::Elem(1));
+        assert_eq!(out.locator().coefficient(0), fgf::gf8b::Elem::from_raw(1));
     }
 }
