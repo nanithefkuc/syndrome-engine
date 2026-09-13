@@ -34,7 +34,7 @@ fgf = { git = "https://github.com/nanithefkuc/fgf", rev = "68cae1fa058e1900e24b9
 # key-equation primitive, Chien search, Hasse/formal derivatives. Bare
 # (`default-features = false`) so the `fft` composition and with it
 # `butterfly-fft` never enter this crate's dependency tree.
-poly-ring = { git = "https://github.com/nanithefkuc/poly-ring", rev = "48f7e8fe8a2f637e18c4fbd241849461404e21c2", default-features = false }
+poly-ring = { git = "https://github.com/nanithefkuc/poly-ring", rev = "4e11703375008dfdacdfe37e87f48b5ee5ed942e", default-features = false }
 rayon = { version = "1", optional = true }
 
 [dev-dependencies]
